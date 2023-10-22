@@ -1,0 +1,1470 @@
+					===== Parallax PIC16Cxx Assembler v4.7 =====
+
+
+     1
+     2    0000-                     		device pic12c509,irc_osc,wdt_off,protect_off,mclr_off
+     3    03FF- 0A00                		reset	init
+     4
+     5                              	;
+     6                              	;	log(hex-dump format) to GPS*.LOG
+     7                              	;	RS : 9600N81
+     8                              	;
+     9
+    10    =0006                     	MMCDO	=	gpio.0
+    11    =0026                     	MMCDI	=	gpio.1
+    12    =0046                     	MMCCS	=	gpio.2
+    13    =0066                     	RX	=	gpio.3
+    14    =0086                     	TX	=	gpio.4
+    15    =00A6                     	MMCCK	=	gpio.5
+    16
+    17    =0003                     	CARRY	=	status.0
+    18    =0043                     	ZERO	=	status.2
+    19                              	;RTCC	=	tmr0
+    20                              	;PC	=	pcl
+    21
+    22    0007-                     		org	7		; bank=0
+    23
+    24    0007-                     	mode	ds	1
+    25
+    26    =0007                     	MODE_DIR	=	mode.0
+    27    =0027                     	MODE_DETECT2LOG	=	mode.1
+    28
+    29    0008-                     	work0	ds	1
+    30    0009-                     	work1	ds	1
+    31
+    32    000A-                     	mmc_packet	ds	6	; addr must be in 0 - 0fh
+    33    0010-                     	bitcount	ds	1
+    34    0011-                     	bytecount	ds	1
+    35    0012-                     	addr	ds	4		; work address register
+    36    0016-                     	c_hsecp	ds	1		; log2 of half-sector(256 bytes)s per cluster
+    37    0017-                     	f_sec	ds	1		; sectors of FAT
+    38
+    39    0018-                     	remain_sec	ds	1	; remain sectors in cluster
+    40    0019-                     	cur_cluster	ds	2	; current cluster
+    41    001B-                     	rem_byte	ds	2	; remain bytes in sector(512 bytes)
+    42
+    43
+    44    0030-                     		org	30h		; bank=1
+    45
+    46    0030-                     	fataddr	ds	4
+    47    0034-                     	useraddr	ds	4
+    48    0038-                     	rdeaddr	ds	4
+    49
+    50    0000-                     		org	0
+    51
+    52    0000-                     	init
+    53                              	;	movlw	7fh
+    54    0000- 0EFF                		andlw	0ffh
+    55    0001- 0EFF                		andlw	0ffh
+    56    0002- 0EFF                		andlw	0ffh
+    57    0003- 0EFF                		andlw	0ffh
+    58    0004- 0EFF                		andlw	0ffh
+    59    0005- 0EFF                		andlw	0ffh
+    60    0006- 0EFF                		andlw	0ffh
+    61    0007- 0025                		movwf	osccal
+    62                              		
+    63    0008- 0B13                		goto	init2
+    64
+    65
+    66    0009-                     	wait1ms
+    67    0009- 0068                		clrf	work0
+    68    000A-                     	:loop
+    69    000A- 0000                		nop
+    70    000B- 02E8                		decfsz	work0, 1
+    71    000C- 0A0A                		goto	:loop
+    72    000D- 0800                		retlw	0
+    73
+    74
+    75    000E-                     	wait250ms
+    76    000E- 0069                		clrf	work1
+    77    000F-                     	:loop
+    78    000F- 0909                		call	wait1ms
+    79    0010- 02E9                		decfsz	work1, 1
+    80    0011- 0A0F                		goto	:loop
+    81    0012- 0800                		retlw	0
+    82
+    83
+    84    0013-                     	wait_rx
+    85    0013- 0C50                		movlw	50h		; 100ms
+    86    0014- 0028                		movwf	work0
+    87    0015- 0069                		clrf	work1		; 5us x 256 = 1280us
+    88    0016-                     	:loop
+    89    0016- 0766                		btfss	RX
+    90    0017- 0800                		retlw	0		; RX detect
+    91                              		
+    92    0018- 02E9                		decfsz	work1, 1
+    93    0019- 0A16                		goto	:loop
+    94    001A- 02E8                		decfsz	work0, 1
+    95    001B- 0A16                		goto	:loop
+    96    001C- 0801                		retlw	1		; time out
+    97
+    98
+    99    001D-                     	wait_rxn
+   100    001D- 0C50                		movlw	50h		; 100ms
+   101    001E- 0028                		movwf	work0
+   102    001F- 0069                		clrf	work1		; 1280us
+   103    0020-                     	:loop
+   104    0020- 0766                		btfss	RX
+   105    0021- 0A1D                		goto	wait_rxn	; RX detect -> reset
+   106                              		
+   107    0022- 02E9                		decfsz	work1, 1
+   108    0023- 0A20                		goto	:loop
+   109    0024- 02E8                		decfsz	work0, 1
+   110    0025- 0A20                		goto	:loop
+   111    0026- 0801                		retlw	1		; time out
+   112
+   113
+   114    0027-                     	rsrecv_start
+   115    0027- 0C41                		movlw	52+3+10		; 1/2 clock (10 : call delay)
+   116    0028- 0021                		movwf	RTCC
+   117    0029-                     	rswait
+   118    0029- 0C65                		movlw	104-3		; 9600bps = 104us / bit
+   119    002A- 00A1                		subwf	RTCC, 1		; RTCC -= (104-3)
+   120    002B-                     	:loop
+   121    002B- 06E1                		btfsc	RTCC, 7
+   122    002C- 0A2B                		goto	:loop
+   123    002D- 0800                		retlw	0
+   124
+   125
+   126    002E-                     	rsrecv_body
+   127                              	;	clrf	work0
+   128    002E- 0C08                		movlw	8
+   129    002F- 0030                		movwf	bitcount
+   130    0030-                     	:loop
+   131    0030- 0929                		call	rswait
+   132                              		
+   133    0031- 0503                		bsf	CARRY
+   134    0032- 0766                		btfss	RX
+   135    0033- 0403                		bcf	CARRY
+   136    0034- 0328                		rrf	work0, 1
+   137                              		
+   138    0035- 02F0                		decfsz	bitcount, 1
+   139    0036- 0A30                		goto	:loop
+   140                              		
+   141    0037- 0800                		retlw	0
+   142
+   143
+   144    0038-                     	rssend
+   145    0038- 0028                		movwf	work0		; entry: W = txdata
+   146                              					; STOP
+   147    0039- 0929                		call	rswait
+   148    003A- 0929                		call	rswait
+   149    003B- 0486                		bcf	TX		; START
+   150    003C- 0929                		call	rswait
+   151                              		
+   152    003D- 0C08                		movlw	8
+   153    003E- 0029                		movwf	work1
+   154    003F-                     	:loop
+   155    003F- 0586                		bsf	TX
+   156    0040- 0708                		btfss	work0, 0
+   157    0041- 0486                		bcf	TX
+   158    0042- 0328                		rrf	work0, 1
+   159    0043- 0929                		call	rswait
+   160                              		
+   161    0044- 02E9                		decfsz	work1, 1
+   162    0045- 0A3F                		goto	:loop
+   163    0046- 0586                		bsf	TX		; STOP
+   164    0047- 0800                		retlw	0
+   165
+   166
+   167    0048-                     	clraddr
+   168    0048- 0072                		clrf	addr
+   169    0049- 0073                		clrf	addr + 1
+   170    004A- 0074                		clrf	addr + 2
+   171    004B- 0075                		clrf	addr + 3
+   172    004C- 0800                		retlw	0
+   173
+   174    004D-                     	getaddr				; [FSR] <- mmc_packet
+   175    004D- 0024                		movwf	FSR
+   176                              		
+   177    004E- 020B                		movf	mmc_packet + 1, 0
+   178    004F- 0020                		movwf	INDF
+   179    0050- 02A4                		incf	FSR, 1
+   180                              		
+   181    0051- 020C                		movf	mmc_packet + 2, 0
+   182    0052- 0020                		movwf	INDF
+   183    0053- 02A4                		incf	FSR, 1
+   184                              		
+   185    0054- 020D                		movf	mmc_packet + 3, 0
+   186    0055- 0020                		movwf	INDF
+   187    0056- 02A4                		incf	FSR, 1
+   188                              		
+   189    0057- 020E                		movf	mmc_packet + 4, 0
+   190    0058- 0020                		movwf	INDF
+   191                              		
+   192    0059- 0800                		retlw	0
+   193
+   194    005A-                     	setaddr				; mmc_packet <- [FSR]
+   195    005A- 0024                		movwf	FSR
+   196                              		
+   197    005B- 0200                		movf	INDF, 0
+   198    005C- 002B                		movwf	mmc_packet + 1
+   199    005D- 02A4                		incf	FSR, 1
+   200                              		
+   201    005E- 0200                		movf	INDF, 0
+   202    005F- 002C                		movwf	mmc_packet + 2
+   203    0060- 02A4                		incf	FSR, 1
+   204                              		
+   205    0061- 0200                		movf	INDF, 0
+   206    0062- 002D                		movwf	mmc_packet + 3
+   207    0063- 02A4                		incf	FSR, 1
+   208                              		
+   209    0064- 0200                		movf	INDF, 0
+   210    0065- 002E                		movwf	mmc_packet + 4
+   211                              		
+   212    0066- 0800                		retlw	0
+   213
+   214    0067-                     	addaddr				; mmc_packet += [FSR]
+   215    0067- 0024                		movwf	FSR
+   216                              		
+   217    0068- 0C03                		movlw	3
+   218    0069- 01E4                		addwf	FSR, 1
+   219                              		
+   220    006A- 0200                		movf	INDF, 0
+   221    006B- 01EE                		addwf	mmc_packet + 4, 1
+   222    006C- 0C01                		movlw	1
+   223    006D- 0603                		btfsc	CARRY
+   224    006E- 01ED                		addwf	mmc_packet + 3, 1
+   225    006F- 0603                		btfsc	CARRY
+   226    0070- 01EC                		addwf	mmc_packet + 2, 1
+   227    0071- 0603                		btfsc	CARRY
+   228    0072- 01EB                		addwf	mmc_packet + 1, 1
+   229                              		
+   230    0073- 00E4                		decf	FSR, 1
+   231                              		
+   232    0074- 0200                		movf	INDF, 0
+   233    0075- 01ED                		addwf	mmc_packet + 3, 1
+   234    0076- 0C01                		movlw	1
+   235    0077- 0603                		btfsc	CARRY
+   236    0078- 01EC                		addwf	mmc_packet + 2, 1
+   237    0079- 0603                		btfsc	CARRY
+   238    007A- 01EB                		addwf	mmc_packet + 1, 1
+   239                              		
+   240    007B- 00E4                		decf	FSR, 1
+   241                              		
+   242    007C- 0200                		movf	INDF, 0
+   243    007D- 01EC                		addwf	mmc_packet + 2, 1
+   244    007E- 0603                		btfsc	CARRY
+   245    007F- 02AB                		incf	mmc_packet + 1, 1
+   246                              		
+   247    0080- 00E4                		decf	FSR, 1
+   248                              		
+   249    0081- 0200                		movf	INDF, 0
+   250    0082- 01EB                		addwf	mmc_packet + 1, 1
+   251                              		
+   252    0083- 0800                		retlw	0
+   253
+   254
+   255    0084-                     	cluster2addr			; cluster to addr
+   256    0084- 0948                		call	clraddr
+   257    0085- 0219                		movf	cur_cluster, 0
+   258    0086- 0033                		movwf	addr + 1
+   259    0087- 0CFE                		movlw	0feh		; -2 : offset
+   260    0088- 01DA                		addwf	cur_cluster + 1, 0
+   261    0089- 0034                		movwf	addr + 2
+   262    008A- 0703                		btfss	CARRY
+   263    008B- 00F3                		decf	addr + 1, 1
+   264                              		
+   265    008C- 0C01                		movlw	1
+   266    008D- 0038                		movwf	remain_sec
+   267                              		
+   268    008E- 0216                		movf	c_hsecp, 0
+   269    008F- 0028                		movwf	work0
+   270    0090-                     	:loop
+   271    0090- 0403                		bcf	CARRY
+   272    0091- 0374                		rlf	addr + 2, 1	; addr = cur_cluster << (c_hsecp + 8)
+   273    0092- 0373                		rlf	addr + 1, 1
+   274    0093- 0372                		rlf	addr + 0, 1
+   275    0094- 0403                		bcf	CARRY
+   276    0095- 0378                		rlf	remain_sec, 1	; remain_sec = 1 << c_hsecp
+   277    0096- 02E8                		decfsz	work0, 1
+   278    0097- 0A90                		goto	:loop
+   279                              		
+   280    0098- 0403                		bcf	CARRY
+   281    0099- 0338                		rrf	remain_sec, 1	; remain_sec = 1 << (c_hsecp - 1)
+   282    009A- 0238                		movf	remain_sec, 1
+   283    009B- 0643                		btfsc	ZERO
+   284    009C- 05F8                		bsf	remain_sec, 7	; remain_sec = 80h
+   285                              		
+   286    009D- 0C34                		movlw	useraddr
+   287    009E- 095A                		call	setaddr
+   288                              	;	clrf	FSR		; select bank-0
+   289                              		
+   290    009F- 0C12                		movlw	addr
+   291    00A0- 0A67                		goto	addaddr
+   292
+   293
+   294    00A1-                     	mmcstart
+   295    00A1- 0446                		bcf	MMCCS
+   296    00A2- 0800                		retlw	0
+   297
+   298
+   299    00A3-                     	mmcstop
+   300    00A3- 0526                		bsf	MMCDI
+   301    00A4- 0C08                		movlw	8
+   302    00A5- 0030                		movwf	bitcount
+   303    00A6-                     	:loop
+   304    00A6- 04A6                		bcf	MMCCK
+   305    00A7- 05A6                		bsf	MMCCK
+   306    00A8- 02F0                		decfsz	bitcount, 1
+   307    00A9- 0AA6                		goto	:loop
+   308                              		
+   309    00AA- 0546                		bsf	MMCCS
+   310                              		
+   311    00AB- 0C08                		movlw	8
+   312    00AC- 0030                		movwf	bitcount
+   313    00AD-                     	:loop2
+   314    00AD- 04A6                		bcf	MMCCK
+   315    00AE- 05A6                		bsf	MMCCK
+   316    00AF- 02F0                		decfsz	bitcount, 1
+   317    00B0- 0AAD                		goto	:loop2
+   318    00B1- 0800                		retlw	0
+   319
+   320
+   321    00B2-                     	mmccmd
+   322    00B2- 0C06                		movlw	6
+   323    00B3- 0031                		movwf	bytecount
+   324    00B4- 0C0A                		movlw	mmc_packet
+   325    00B5- 0024                		movwf	FSR
+   326    00B6-                     	:loop
+   327    00B6- 0200                		movf	INDF, 0
+   328    00B7- 09E8                		call	mmcwrite
+   329                              		
+   330    00B8- 02A4                		incf	FSR, 1
+   331    00B9- 02F1                		decfsz	bytecount, 1
+   332    00BA- 0AB6                		goto	:loop
+   333    00BB-                     	:loop2
+   334    00BB- 09D4                		call	mmcread
+   335    00BC- 06EA                		btfsc	mmc_packet, 7
+   336    00BD- 0ABB                		goto	:loop2
+   337    00BE- 0800                		retlw	0		; card ready
+   338
+   339
+   340    00BF-                     	waitread			; wait for data-packet start byte
+   341    00BF-                     	:loop
+   342    00BF- 09D4                		call	mmcread
+   343                              		
+   344    00C0- 020A                		movf	mmc_packet, 0
+   345    00C1- 0FFF                		xorlw	0ffh
+   346    00C2- 0643                		btfsc	ZERO
+   347    00C3- 0ABF                		goto	:loop		; card busy
+   348                              		
+   349    00C4- 020A                		movf	mmc_packet, 0
+   350    00C5- 0FFE                		xorlw	0feh		; data-start
+   351    00C6- 0743                		btfss	ZERO
+   352    00C7- 0ABF                		goto	:loop
+   353    00C8- 0800                		retlw	0
+   354
+   355
+   356    00C9-                     	waitwrite
+   357    00C9-                     	:loop
+   358    00C9- 09D4                		call	mmcread
+   359    00CA- 020A                		movf	mmc_packet, 0
+   360    00CB- 0E1F                		andlw	1fh
+   361    00CC- 0F05                		xorlw	5
+   362    00CD- 0743                		btfss	ZERO		; data-packet receive complete
+   363    00CE- 0AC9                		goto	:loop
+   364    00CF-                     	:loop2
+   365    00CF- 09D4                		call	mmcread
+   366    00D0- 020A                		movf	mmc_packet, 0
+   367    00D1- 0643                		btfsc	ZERO
+   368    00D2- 0ACF                		goto	:loop2		; card busy
+   369                              		
+   370    00D3- 0800                		retlw	0
+   371
+   372
+   373    00D4-                     	mmcread
+   374    00D4- 0C08                		movlw	8
+   375    00D5- 0030                		movwf	bitcount
+   376    00D6-                     	:loop
+   377    00D6- 04A6                		bcf	MMCCK
+   378    00D7- 05A6                		bsf	MMCCK
+   379                              		
+   380    00D8- 0403                		bcf	CARRY
+   381    00D9- 0606                		btfsc	MMCDO
+   382    00DA- 0503                		bsf	CARRY
+   383                              		
+   384    00DB- 036A                		rlf	mmc_packet, 1
+   385                              		
+   386    00DC- 02F0                		decfsz	bitcount, 1
+   387    00DD- 0AD6                		goto	:loop
+   388                              		
+   389    00DE- 0800                		retlw	0
+   390
+   391
+   392    00DF-                     	mmcwrite_hex			; write '0'-'f' for lower 4 bits
+   393    00DF- 0E0F                		andlw	0fh
+   394    00E0- 0029                		movwf	work1
+   395    00E1- 0CF6                		movlw	0f6h
+   396    00E2- 01E9                		addwf	work1, 1	; 0xf6 + 9 = 0xff
+   397    00E3- 0C27                		movlw	27h
+   398    00E4- 0603                		btfsc	CARRY
+   399    00E5- 01E9                		addwf	work1, 1	; 0x27 + 0x3a + 0 = 0x61 ('a')
+   400    00E6- 0C3A                		movlw	3ah
+   401    00E7- 01C9                		addwf	work1, 0	; 0x3a + 0xff = 0x39 ('9')
+   402    00E8-                     	mmcwrite		; this addr must be in 0-0ffh (constraints of 'call')
+   403    00E8- 002A                		movwf	mmc_packet
+   404                              		
+   405    00E9- 0526                		bsf	MMCDI
+   406    00EA- 07EA                		btfss	mmc_packet, 7
+   407    00EB- 0426                		bcf	MMCDI
+   408    00EC- 04A6                		bcf	MMCCK
+   409    00ED- 05A6                		bsf	MMCCK
+   410                              		
+   411    00EE- 0526                		bsf	MMCDI
+   412    00EF- 07CA                		btfss	mmc_packet, 6
+   413    00F0- 0426                		bcf	MMCDI
+   414    00F1- 04A6                		bcf	MMCCK
+   415    00F2- 05A6                		bsf	MMCCK
+   416                              		
+   417    00F3- 0526                		bsf	MMCDI
+   418    00F4- 07AA                		btfss	mmc_packet, 5
+   419    00F5- 0426                		bcf	MMCDI
+   420    00F6- 04A6                		bcf	MMCCK
+   421    00F7- 05A6                		bsf	MMCCK
+   422                              		
+   423    00F8- 0526                		bsf	MMCDI
+   424    00F9- 078A                		btfss	mmc_packet, 4
+   425    00FA- 0426                		bcf	MMCDI
+   426    00FB- 04A6                		bcf	MMCCK
+   427    00FC- 05A6                		bsf	MMCCK
+   428                              		
+   429    00FD- 0526                		bsf	MMCDI
+   430    00FE- 076A                		btfss	mmc_packet, 3
+   431    00FF- 0426                		bcf	MMCDI
+   432    0100- 04A6                		bcf	MMCCK
+   433    0101- 05A6                		bsf	MMCCK
+   434                              		
+   435    0102- 0526                		bsf	MMCDI
+   436    0103- 074A                		btfss	mmc_packet, 2
+   437    0104- 0426                		bcf	MMCDI
+   438    0105- 04A6                		bcf	MMCCK
+   439    0106- 05A6                		bsf	MMCCK
+   440                              		
+   441    0107- 0526                		bsf	MMCDI
+   442    0108- 072A                		btfss	mmc_packet, 1
+   443    0109- 0426                		bcf	MMCDI
+   444    010A- 04A6                		bcf	MMCCK
+   445    010B- 05A6                		bsf	MMCCK
+   446                              		
+   447    010C- 0526                		bsf	MMCDI
+   448    010D- 070A                		btfss	mmc_packet, 0
+   449    010E- 0426                		bcf	MMCDI
+   450    010F- 04A6                		bcf	MMCCK
+   451    0110- 05A6                		bsf	MMCCK
+   452                              		
+   453    0111- 0526                		bsf	MMCDI
+   454    0112- 0800                		retlw	0
+   455
+   456
+   457    0113-                     	init2
+   458    0113- 0C36                		movlw	36h		;GPIO:--11-11-
+   459    0114- 0026                		movwf	gpio
+   460    0115- 0C09                		movlw	9		;GPIO:--OOIOOI
+   461    0116- 0006                		tris	gpio
+   462    0117- 0C8F                		movlw	8fh		;GPPU tmr0=1MHz
+   463    0118- 0002                		option
+   464                              		
+   465    0119- 0061                		clrf	tmr0
+   466                              		
+   467    011A- 0067                		clrf	mode
+   468    011B- 006A                		clrf	mmc_packet
+   469    011C- 006B                		clrf	mmc_packet + 1
+   470    011D- 006C                		clrf	mmc_packet + 2
+   471    011E- 006D                		clrf	mmc_packet + 3
+   472    011F- 006E                		clrf	mmc_packet + 4
+   473    0120- 006F                		clrf	mmc_packet + 5
+   474    0121-                     	main
+   475    0121- 090E                		call	wait250ms
+   476                              		
+   477    0122-                     	reset0
+   478    0122- 0C50                		movlw	80		; reset : 80clk
+   479    0123- 0028                		movwf	work0
+   480    0124-                     	:loop
+   481    0124- 04A6                		bcf	MMCCK
+   482    0125- 05A6                		bsf	MMCCK
+   483    0126- 02E8                		decfsz	work0, 1
+   484    0127- 0B24                		goto	:loop
+   485                              		
+   486    0128- 09A1                		call	mmcstart
+   487    0129- 0C40                		movlw	40h		; cmd0
+   488    012A- 002A                		movwf	mmc_packet
+   489    012B- 0C95                		movlw	95h		; crc
+   490    012C- 002F                		movwf	mmc_packet + 5
+   491    012D- 09B2                		call	mmccmd
+   492    012E- 0CFF                		movlw	0ffh
+   493    012F- 002F                		movwf	mmc_packet + 5
+   494    0130- 09A3                		call	mmcstop
+   495                              		
+   496    0131- 020A                		movf	mmc_packet, 0
+   497    0132- 0F01                		xorlw	1
+   498    0133- 0C11                		movlw	11h		; cmd0 failed
+   499    0134- 0743                		btfss	ZERO
+   500    0135- 0BD6                		goto	halt
+   501    0136-                     	reset1
+   502    0136- 090E                		call	wait250ms
+   503                              		
+   504    0137- 09A1                		call	mmcstart
+   505    0138- 0C41                		movlw	41h		; cmd1
+   506    0139- 002A                		movwf	mmc_packet
+   507    013A- 09B2                		call	mmccmd
+   508    013B- 09A3                		call	mmcstop
+   509                              		
+   510    013C- 020A                		movf	mmc_packet, 0
+   511    013D- 0F01                		xorlw	1		; 1: card busy
+   512    013E- 0643                		btfsc	ZERO
+   513    013F- 0B36                		goto	reset1
+   514                              		
+   515    0140- 020A                		movf	mmc_packet, 0
+   516    0141- 0C12                		movlw	12h		; cmd1 failed
+   517    0142- 0743                		btfss	ZERO
+   518    0143- 0BD6                		goto	halt
+   519                              		
+   520    0144- 09A1                		call	mmcstart
+   521    0145- 0C50                		movlw	50h		; set_blocklen
+   522    0146- 002A                		movwf	mmc_packet
+   523    0147- 006B                		clrf	mmc_packet + 1
+   524    0148- 006C                		clrf	mmc_packet + 2
+   525    0149- 0C02                		movlw	2
+   526    014A- 002D                		movwf	mmc_packet + 3	; 200h = 512bytes / sector
+   527    014B- 006E                		clrf	mmc_packet + 4
+   528    014C- 09B2                		call	mmccmd
+   529    014D- 006D                		clrf	mmc_packet + 3
+   530    014E- 09A3                		call	mmcstop
+   531                              		
+   532    014F- 020A                		movf	mmc_packet, 0
+   533    0150- 0C13                		movlw	13h		; set_blocklen failed
+   534    0151- 0743                		btfss	ZERO
+   535    0152- 0BD6                		goto	halt
+   536                              		
+   537    0153-                     	getmbr
+   538    0153- 09A1                		call	mmcstart
+   539    0154- 0C51                		movlw	51h		; read single block
+   540    0155- 002A                		movwf	mmc_packet
+   541    0156- 006B                		clrf	mmc_packet + 1	; MBR
+   542    0157- 006C                		clrf	mmc_packet + 2
+   543    0158- 006D                		clrf	mmc_packet + 3
+   544    0159- 006E                		clrf	mmc_packet + 4
+   545    015A- 09B2                		call	mmccmd
+   546                              		
+   547    015B- 020A                		movf	mmc_packet, 0
+   548    015C- 0C31                		movlw	31h		; MBR read failed
+   549    015D- 0743                		btfss	ZERO
+   550    015E- 0BD6                		goto	halt
+   551                              		
+   552    015F- 09BF                		call	waitread
+   553                              		
+   554    0160- 0CE3                		movlw	0e3h		; skip 1c6h bytes
+   555    0161- 0028                		movwf	work0
+   556    0162-                     	:loop1
+   557    0162- 09D4                		call	mmcread
+   558    0163- 09D4                		call	mmcread
+   559    0164- 02E8                		decfsz	work0, 1
+   560    0165- 0B62                		goto	:loop1
+   561                              		
+   562    0166- 09D4                		call	mmcread		; off = 1c6h: sector number of first partition
+   563    0167- 020A                		movf	mmc_packet, 0
+   564    0168- 002D                		movwf	mmc_packet + 3
+   565    0169- 09D4                		call	mmcread		; off = 1c7h
+   566    016A- 020A                		movf	mmc_packet, 0
+   567    016B- 002C                		movwf	mmc_packet + 2
+   568    016C- 09D4                		call	mmcread		; off = 1c8h
+   569    016D- 020A                		movf	mmc_packet, 0
+   570    016E- 002B                		movwf	mmc_packet + 1
+   571    016F- 09D4                		call	mmcread		; off = 1c9h
+   572                              		
+   573    0170- 0403                		bcf	CARRY
+   574    0171- 036D                		rlf	mmc_packet + 3, 1	; addr = sector_number << 9
+   575    0172- 036C                		rlf	mmc_packet + 2, 1
+   576    0173- 036B                		rlf	mmc_packet + 1, 1
+   577                              		
+   578    0174- 0C34                		movlw	34h		; skip 34h bytes
+   579    0175- 0028                		movwf	work0
+   580    0176-                     	:loop2
+   581    0176- 09D4                		call	mmcread
+   582    0177- 02E8                		decfsz	work0, 1
+   583    0178- 0B76                		goto	:loop2
+   584                              		
+   585    0179- 09D4                		call	mmcread		; off = 1feh
+   586    017A- 020A                		movf	mmc_packet, 0
+   587    017B- 0F55                		xorlw	55h
+   588    017C- 0C32                		movlw	32h		; MBR signature error
+   589    017D- 0743                		btfss	ZERO
+   590    017E- 0BD6                		goto	halt
+   591                              		
+   592    017F- 09D4                		call	mmcread		; off = 1ffh
+   593    0180- 020A                		movf	mmc_packet, 0
+   594    0181- 0FAA                		xorlw	0aah
+   595    0182- 0C32                		movlw	32h		; MBR signature error
+   596    0183- 0743                		btfss	ZERO
+   597    0184- 0BD6                		goto	halt
+   598                              		
+   599    0185- 09D4                		call	mmcread		;CRC
+   600    0186- 09D4                		call	mmcread
+   601    0187- 09A3                		call	mmcstop
+   602                              		
+   603    0188-                     	getpbr
+   604    0188- 09A1                		call	mmcstart
+   605    0189- 0C51                		movlw	51h		; read single block
+   606    018A- 002A                		movwf	mmc_packet
+   607    018B- 09B2                		call	mmccmd
+   608                              		
+   609    018C- 020A                		movf	mmc_packet, 0
+   610    018D- 0C41                		movlw	41h		; PBR read failed
+   611    018E- 0743                		btfss	ZERO
+   612    018F- 0BD6                		goto	halt
+   613                              		
+   614    0190- 09BF                		call	waitread
+   615                              		
+   616    0191- 0C0D                		movlw	0dh		; skip 0dh bytes
+   617    0192- 0028                		movwf	work0
+   618    0193-                     	:loop1
+   619    0193- 09D4                		call	mmcread
+   620    0194- 02E8                		decfsz	work0, 1
+   621    0195- 0B93                		goto	:loop1
+   622                              		
+   623    0196- 09D4                		call	mmcread		; off = 0dh: half-sector(256 bytes)s / cluster
+   624    0197- 0076                		clrf	c_hsecp
+   625                              		
+   626    0198-                     	:powcnt
+   627    0198- 02B6                		incf	c_hsecp, 1
+   628    0199- 0403                		bcf	CARRY
+   629    019A- 032A                		rrf	mmc_packet, 1
+   630    019B- 022A                		movf	mmc_packet, 1
+   631    019C- 0743                		btfss	ZERO
+   632    019D- 0B98                		goto	:powcnt
+   633                              		
+   634    019E- 0C08                		movlw	8		; skip 8 bytes
+   635    019F- 0028                		movwf	work0
+   636    01A0-                     	:loop2
+   637    01A0- 09D4                		call	mmcread
+   638    01A1- 02E8                		decfsz	work0, 1
+   639    01A2- 0BA0                		goto	:loop2
+   640                              		
+   641    01A3- 09D4                		call	mmcread		; off = 16h
+   642    01A4- 020A                		movf	mmc_packet, 0
+   643    01A5- 0037                		movwf	f_sec
+   644                              		
+   645    01A6- 0C1F                		movlw	1fh		; skip 1fh bytes
+   646    01A7- 0028                		movwf	work0
+   647    01A8-                     	:loop3
+   648    01A8- 09D4                		call	mmcread
+   649    01A9- 02E8                		decfsz	work0, 1
+   650    01AA- 0BA8                		goto	:loop3
+   651                              		
+   652    01AB- 09D4                		call	mmcread		; off = 36h
+   653    01AC- 020A                		movf	mmc_packet, 0
+   654    01AD- 0F46                		xorlw	46h		; 'F'
+   655    01AE- 0743                		btfss	ZERO
+   656    01AF- 0BD5                		goto	halt42
+   657                              		
+   658    01B0- 09D4                		call	mmcread		; off = 37h
+   659    01B1- 020A                		movf	mmc_packet, 0
+   660    01B2- 0F41                		xorlw	41h		; 'A'
+   661    01B3- 0743                		btfss	ZERO
+   662    01B4- 0BD5                		goto	halt42
+   663                              		
+   664    01B5- 09D4                		call	mmcread		; off = 38h
+   665    01B6- 020A                		movf	mmc_packet, 0
+   666    01B7- 0F54                		xorlw	54h		; 'T'
+   667    01B8- 0743                		btfss	ZERO
+   668    01B9- 0BD5                		goto	halt42
+   669                              		
+   670    01BA- 09D4                		call	mmcread		; off = 39h
+   671    01BB- 020A                		movf	mmc_packet, 0
+   672    01BC- 0F31                		xorlw	31h		; '1'
+   673    01BD- 0743                		btfss	ZERO
+   674    01BE- 0BD5                		goto	halt42
+   675                              		
+   676    01BF- 09D4                		call	mmcread		; off = 3ah
+   677    01C0- 020A                		movf	mmc_packet, 0
+   678    01C1- 0F36                		xorlw	36h		; '6'
+   679    01C2- 0743                		btfss	ZERO
+   680    01C3- 0BD5                		goto	halt42
+   681                              		
+   682    01C4- 09D4                		call	mmcread		; off = 3bh
+   683    01C5- 020A                		movf	mmc_packet, 0
+   684    01C6- 0F20                		xorlw	20h		; ' '
+   685    01C7- 0743                		btfss	ZERO
+   686    01C8- 0BD5                		goto	halt42
+   687                              		
+   688    01C9- 09D4                		call	mmcread		; off = 3ch
+   689    01CA- 020A                		movf	mmc_packet, 0
+   690    01CB- 0F20                		xorlw	20h		; ' '
+   691    01CC- 0743                		btfss	ZERO
+   692    01CD- 0BD5                		goto	halt42
+   693                              		
+   694    01CE- 09D4                		call	mmcread		; off = 3dh
+   695    01CF- 020A                		movf	mmc_packet, 0
+   696    01D0- 0F20                		xorlw	20h		; ' '
+   697    01D1- 0743                		btfss	ZERO
+   698    01D2- 0BD5                		goto	halt42
+   699                              		
+   700    01D3- 05A3                		bsf	PA0
+   701    01D4- 0A00                		goto	getpbr_h
+   702
+   703    01D5-                     	halt42
+   704    01D5- 0C42                		movlw	42h
+   705    01D6-                     	halt			; this addr must be in 0-1ffh (constraints of 'goto')
+   706    01D6- 002A                		movwf	mmc_packet
+   707    01D7- 09A3                		call	mmcstop
+   708    01D8-                     	:loop0
+   709    01D8- 090E                		call	wait250ms
+   710    01D9- 090E                		call	wait250ms
+   711    01DA- 090E                		call	wait250ms
+   712    01DB- 090E                		call	wait250ms
+   713    01DC- 090E                		call	wait250ms
+   714    01DD- 090E                		call	wait250ms
+   715                              		
+   716    01DE- 0071                		clrf	bytecount
+   717    01DF-                     	:loop1
+   718    01DF- 0446                		bcf	MMCCS
+   719    01E0- 090E                		call	wait250ms
+   720    01E1- 0546                		bsf	MMCCS
+   721    01E2- 090E                		call	wait250ms
+   722                              		
+   723    01E3- 0C10                		movlw	10h
+   724    01E4- 01F1                		addwf	bytecount, 1
+   725                              		
+   726    01E5- 0211                		movf	bytecount, 0
+   727    01E6- 018A                		xorwf	mmc_packet, 0
+   728    01E7- 0EF0                		andlw	0f0h
+   729                              		
+   730    01E8- 0743                		btfss	ZERO
+   731    01E9- 0BDF                		goto	:loop1
+   732                              		
+   733    01EA- 090E                		call	wait250ms
+   734    01EB- 090E                		call	wait250ms
+   735    01EC-                     	:loop2
+   736    01EC- 0211                		movf	bytecount, 0
+   737    01ED- 018A                		xorwf	mmc_packet, 0
+   738    01EE- 0E0F                		andlw	0fh
+   739                              		
+   740    01EF- 0643                		btfsc	ZERO
+   741    01F0- 0BD8                		goto	:loop0
+   742                              		
+   743    01F1- 0446                		bcf	MMCCS
+   744    01F2- 090E                		call	wait250ms
+   745    01F3- 0546                		bsf	MMCCS
+   746    01F4- 090E                		call	wait250ms
+   747                              		
+   748    01F5- 02B1                		incf	bytecount, 1
+   749    01F6- 0BEC                		goto	:loop2
+   750
+   751
+   752    0200-                     		org	200h
+   753    0200-                     	getpbr_h
+   754    0200- 0CE0                		movlw	0e0h		; skip 1c0h bytes
+   755    0201- 0028                		movwf	work0
+   756    0202-                     	:loop3
+   757    0202- 04A3                		bcf	PA0
+   758    0203- 09D4                		call	mmcread
+   759    0204- 09D4                		call	mmcread
+   760                              		
+   761    0205- 05A3                		bsf	PA0
+   762    0206- 02E8                		decfsz	work0, 1
+   763    0207- 0A02                		goto	:loop3
+   764                              		
+   765    0208- 04A3                		bcf	PA0
+   766                              		
+   767    0209- 09D4                		call	mmcread		; off = 1feh
+   768    020A- 020A                		movf	mmc_packet, 0
+   769    020B- 0F55                		xorlw	55h
+   770    020C- 0C43                		movlw	43h		; PBR signature error
+   771    020D- 0743                		btfss	ZERO
+   772    020E- 0BD6                		goto	halt
+   773                              		
+   774    020F- 09D4                		call	mmcread		; off = 1ffh
+   775    0210- 020A                		movf	mmc_packet, 0
+   776    0211- 0FAA                		xorlw	0aah
+   777    0212- 0C43                		movlw	43h		; PBR signature error
+   778    0213- 0743                		btfss	ZERO
+   779    0214- 0BD6                		goto	halt
+   780                              		
+   781    0215- 09D4                		call	mmcread		;CRC
+   782    0216- 09D4                		call	mmcread
+   783    0217- 09A3                		call	mmcstop
+   784                              		
+   785    0218- 0948                		call	clraddr
+   786    0219- 0C02                		movlw	2		; size of PBR
+   787    021A- 0034                		movwf	addr + 2
+   788                              		
+   789    021B- 0C12                		movlw	addr
+   790    021C- 0967                		call	addaddr
+   791                              		
+   792    021D- 0C30                		movlw	fataddr		; fataddr = PBR + size of PBR
+   793    021E- 094D                		call	getaddr
+   794    021F- 0064                		clrf	FSR		; select bank-0
+   795                              		
+   796    0220- 0948                		call	clraddr
+   797    0221- 0217                		movf	f_sec, 0
+   798    0222- 0034                		movwf	addr + 2
+   799                              		
+   800    0223- 0403                		bcf	CARRY
+   801    0224- 0374                		rlf	addr + 2, 1	; RDE = fataddr + 0x200 * 2 * f_sec
+   802                              					; 2 FATs exist on disk
+   803    0225- 0373                		rlf	addr + 1, 1
+   804    0226- 0403                		bcf	CARRY
+   805    0227- 0374                		rlf	addr + 2, 1
+   806    0228- 0373                		rlf	addr + 1, 1
+   807                              		
+   808    0229- 0C12                		movlw	addr
+   809    022A- 0967                		call	addaddr
+   810                              		
+   811    022B- 0C38                		movlw	rdeaddr
+   812    022C- 094D                		call	getaddr
+   813    022D- 0064                		clrf	FSR		; select bank-0
+   814                              		
+   815    022E- 0948                		call	clraddr
+   816    022F- 0C40                		movlw	40h		; size of RDE
+   817    0230- 0034                		movwf	addr + 2
+   818                              		
+   819    0231- 0C12                		movlw	addr
+   820    0232- 0967                		call	addaddr
+   821                              		
+   822    0233- 0C34                		movlw	useraddr	; useraddr = RDE + size of RDE
+   823    0234- 094D                		call	getaddr
+   824                              	;	clrf	FSR		; select bank-0
+   825                              		
+   826    0235- 0C38                		movlw	rdeaddr
+   827    0236- 095A                		call	setaddr
+   828    0237- 0064                		clrf	FSR		; select bank-0
+   829                              		
+   830                              	;	bsf	PA0
+   831    0238-                     	getrde
+   832    0238- 04A3                		bcf	PA0
+   833                              		
+   834    0239- 0407                		bcf	MODE_DIR
+   835                              		
+   836    023A- 09A1                		call	mmcstart
+   837    023B- 0C51                		movlw	51h		; read single block
+   838    023C- 002A                		movwf	mmc_packet
+   839    023D- 09B2                		call	mmccmd
+   840                              		
+   841    023E- 020A                		movf	mmc_packet, 0
+   842    023F- 0C51                		movlw	51h		; RDE read failed
+   843    0240- 0743                		btfss	ZERO
+   844    0241- 0BD6                		goto	halt
+   845                              		
+   846    0242- 09BF                		call	waitread
+   847                              		
+   848    0243- 0079                		clrf	cur_cluster	; cur_cluster = 0: not found
+   849    0244- 007A                		clrf	cur_cluster + 1
+   850                              		
+   851    0245- 0C10                		movlw	10h		; 10h entries / sector
+   852    0246- 0028                		movwf	work0
+   853                              		
+   854    0247-                     	:loop1
+   855    0247- 0C20                		movlw	20h		; 20h bytes / sector
+   856    0248- 0029                		movwf	work1
+   857                              		
+   858    0249- 05A3                		bsf	PA0
+   859                              		
+   860    024A- 0219                		movf	cur_cluster, 0
+   861    024B- 011A                		iorwf	cur_cluster + 1, 0
+   862    024C- 0743                		btfss	ZERO
+   863    024D- 0B02                		goto	:next		; cur_cluster already set
+   864                              		
+   865    024E- 04A3                		bcf	PA0
+   866    024F- 09D4                		call	mmcread		; off = 0
+   867    0250- 00E9                		decf	work1, 1
+   868                              		
+   869    0251- 022A                		movf	mmc_packet, 1
+   870    0252- 0C52                		movlw	52h		; end of RDE
+   871    0253- 0643                		btfsc	ZERO
+   872    0254- 0BD6                		goto	halt		; first byte = 0
+   873                              		
+   874    0255- 05A3                		bsf	PA0
+   875                              		
+   876    0256- 020A                		movf	mmc_packet, 0
+   877    0257- 0F47                		xorlw	47h		; 'G'
+   878    0258- 0743                		btfss	ZERO
+   879    0259- 0A94                		goto	:checkdir
+   880                              		
+   881    025A- 04A3                		bcf	PA0
+   882    025B- 09D4                		call	mmcread		; off = 1
+   883    025C- 00E9                		decf	work1, 1
+   884                              		
+   885    025D- 05A3                		bsf	PA0
+   886                              		
+   887    025E- 020A                		movf	mmc_packet, 0
+   888    025F- 0F50                		xorlw	50h		; 'P'
+   889    0260- 0743                		btfss	ZERO
+   890    0261- 0B02                		goto	:next
+   891                              		
+   892    0262- 04A3                		bcf	PA0
+   893    0263- 09D4                		call	mmcread		; off = 2
+   894    0264- 00E9                		decf	work1, 1
+   895                              		
+   896    0265- 05A3                		bsf	PA0
+   897                              		
+   898    0266- 020A                		movf	mmc_packet, 0
+   899    0267- 0F53                		xorlw	53h		; 'S'
+   900    0268- 0743                		btfss	ZERO
+   901    0269- 0B02                		goto	:next
+   902                              		
+   903    026A- 04A3                		bcf	PA0
+   904    026B- 09D4                		call	mmcread		; off = 3
+   905    026C- 064A                		btfsc	mmc_packet, 2	; 'D'
+   906    026D- 0527                		bsf	MODE_DETECT2LOG
+   907                              		
+   908    026E- 09D4                		call	mmcread		; off = 4
+   909    026F- 09D4                		call	mmcread
+   910    0270- 09D4                		call	mmcread
+   911    0271- 09D4                		call	mmcread
+   912                              		
+   913    0272- 0C05                		movlw	5
+   914    0273- 00A9                		subwf	work1, 1
+   915                              		
+   916                              	;	bcf	PA0
+   917    0274- 09D4                		call	mmcread		; off = 8
+   918    0275- 00E9                		decf	work1, 1
+   919                              		
+   920    0276- 05A3                		bsf	PA0
+   921                              		
+   922    0277- 020A                		movf	mmc_packet, 0
+   923    0278- 0F4C                		xorlw	4ch		; 'L'
+   924    0279- 0743                		btfss	ZERO
+   925    027A- 0B02                		goto	:next
+   926                              		
+   927    027B- 04A3                		bcf	PA0
+   928    027C- 09D4                		call	mmcread		; off = 9
+   929    027D- 00E9                		decf	work1, 1
+   930                              		
+   931    027E- 05A3                		bsf	PA0
+   932                              		
+   933    027F- 020A                		movf	mmc_packet, 0
+   934    0280- 0F4F                		xorlw	4fh		; 'O'
+   935    0281- 0743                		btfss	ZERO
+   936    0282- 0B02                		goto	:next
+   937                              		
+   938    0283- 04A3                		bcf	PA0
+   939    0284- 09D4                		call	mmcread		; off = 0ah
+   940    0285- 00E9                		decf	work1, 1
+   941                              		
+   942    0286- 05A3                		bsf	PA0
+   943                              		
+   944    0287- 020A                		movf	mmc_packet, 0
+   945    0288- 0F47                		xorlw	47h		; 'G'
+   946    0289- 0743                		btfss	ZERO
+   947    028A- 0B02                		goto	:next
+   948                              		
+   949    028B- 04A3                		bcf	PA0
+   950    028C- 09D4                		call	mmcread		; off = 0bh
+   951    028D- 00E9                		decf	work1, 1
+   952                              		
+   953    028E- 05A3                		bsf	PA0
+   954                              		
+   955    028F- 020A                		movf	mmc_packet, 0
+   956    0290- 0E1F                		andlw	1fh		; DIR | VOL | HID | SYS | RO
+   957    0291- 0743                		btfss	ZERO
+   958    0292- 0B02                		goto	:next
+   959    0293- 0AF2                		goto	:find
+   960                              		
+   961    0294-                     	:checkdir
+   962                              	;	bsf	PA0
+   963    0294- 020A                		movf	mmc_packet, 0
+   964    0295- 0F49                		xorlw	49h		; 'I'
+   965    0296- 0743                		btfss	ZERO
+   966    0297- 0B02                		goto	:next
+   967                              		
+   968    0298- 04A3                		bcf	PA0
+   969    0299- 09D4                		call	mmcread		; off = 1
+   970    029A- 00E9                		decf	work1, 1
+   971                              		
+   972    029B- 05A3                		bsf	PA0
+   973                              		
+   974    029C- 020A                		movf	mmc_packet, 0
+   975    029D- 0F4D                		xorlw	4dh		; 'M'
+   976    029E- 0743                		btfss	ZERO
+   977    029F- 0B02                		goto	:next
+   978                              		
+   979    02A0- 04A3                		bcf	PA0
+   980    02A1- 09D4                		call	mmcread		; off = 2
+   981    02A2- 00E9                		decf	work1, 1
+   982                              		
+   983    02A3- 05A3                		bsf	PA0
+   984                              		
+   985    02A4- 020A                		movf	mmc_packet, 0
+   986    02A5- 0F45                		xorlw	45h		; 'E'
+   987    02A6- 0743                		btfss	ZERO
+   988    02A7- 0B02                		goto	:next
+   989                              		
+   990    02A8- 04A3                		bcf	PA0
+   991    02A9- 09D4                		call	mmcread		; off = 3
+   992    02AA- 00E9                		decf	work1, 1
+   993                              		
+   994    02AB- 05A3                		bsf	PA0
+   995                              		
+   996    02AC- 020A                		movf	mmc_packet, 0
+   997    02AD- 0F58                		xorlw	58h		; 'X'
+   998    02AE- 0743                		btfss	ZERO
+   999    02AF- 0B02                		goto	:next
+  1000                              		
+  1001    02B0- 04A3                		bcf	PA0
+  1002    02B1- 09D4                		call	mmcread		; off = 4
+  1003    02B2- 00E9                		decf	work1, 1
+  1004                              		
+  1005    02B3- 05A3                		bsf	PA0
+  1006                              		
+  1007    02B4- 020A                		movf	mmc_packet, 0
+  1008    02B5- 0F50                		xorlw	50h		; 'P'
+  1009    02B6- 0743                		btfss	ZERO
+  1010    02B7- 0B02                		goto	:next
+  1011                              		
+  1012    02B8- 04A3                		bcf	PA0
+  1013    02B9- 09D4                		call	mmcread		; off = 5
+  1014    02BA- 00E9                		decf	work1, 1
+  1015                              		
+  1016    02BB- 05A3                		bsf	PA0
+  1017                              		
+  1018    02BC- 020A                		movf	mmc_packet, 0
+  1019    02BD- 0F4F                		xorlw	4fh		; 'O'
+  1020    02BE- 0743                		btfss	ZERO
+  1021    02BF- 0B02                		goto	:next
+  1022                              		
+  1023    02C0- 04A3                		bcf	PA0
+  1024    02C1- 09D4                		call	mmcread		; off = 6
+  1025    02C2- 00E9                		decf	work1, 1
+  1026                              		
+  1027    02C3- 05A3                		bsf	PA0
+  1028                              		
+  1029    02C4- 020A                		movf	mmc_packet, 0
+  1030    02C5- 0F52                		xorlw	52h		; 'R'
+  1031    02C6- 0743                		btfss	ZERO
+  1032    02C7- 0B02                		goto	:next
+  1033                              		
+  1034    02C8- 04A3                		bcf	PA0
+  1035    02C9- 09D4                		call	mmcread		; off = 7
+  1036    02CA- 00E9                		decf	work1, 1
+  1037                              		
+  1038    02CB- 05A3                		bsf	PA0
+  1039                              		
+  1040    02CC- 020A                		movf	mmc_packet, 0
+  1041    02CD- 0F54                		xorlw	54h		; 'T'
+  1042    02CE- 0743                		btfss	ZERO
+  1043    02CF- 0B02                		goto	:next
+  1044                              		
+  1045    02D0- 04A3                		bcf	PA0
+  1046    02D1- 09D4                		call	mmcread		; off = 8
+  1047    02D2- 00E9                		decf	work1, 1
+  1048                              		
+  1049    02D3- 05A3                		bsf	PA0
+  1050                              		
+  1051    02D4- 020A                		movf	mmc_packet, 0
+  1052    02D5- 0F20                		xorlw	20h		; ' '
+  1053    02D6- 0743                		btfss	ZERO
+  1054    02D7- 0B02                		goto	:next
+  1055                              		
+  1056    02D8- 04A3                		bcf	PA0
+  1057    02D9- 09D4                		call	mmcread		; off = 9
+  1058    02DA- 00E9                		decf	work1, 1
+  1059                              		
+  1060    02DB- 05A3                		bsf	PA0
+  1061                              		
+  1062    02DC- 020A                		movf	mmc_packet, 0
+  1063    02DD- 0F20                		xorlw	20h		; ' '
+  1064    02DE- 0743                		btfss	ZERO
+  1065    02DF- 0B02                		goto	:next
+  1066                              		
+  1067    02E0- 04A3                		bcf	PA0
+  1068    02E1- 09D4                		call	mmcread		; off = 0ah
+  1069    02E2- 00E9                		decf	work1, 1
+  1070                              		
+  1071    02E3- 05A3                		bsf	PA0
+  1072                              		
+  1073    02E4- 020A                		movf	mmc_packet, 0
+  1074    02E5- 0F20                		xorlw	20h		; ' '
+  1075    02E6- 0743                		btfss	ZERO
+  1076    02E7- 0B02                		goto	:next
+  1077                              		
+  1078    02E8- 04A3                		bcf	PA0
+  1079    02E9- 09D4                		call	mmcread		; off = 0bh
+  1080    02EA- 00E9                		decf	work1, 1
+  1081                              		
+  1082    02EB- 05A3                		bsf	PA0
+  1083                              		
+  1084    02EC- 020A                		movf	mmc_packet, 0
+  1085    02ED- 0F10                		xorlw	10h
+  1086    02EE- 0E1E                		andlw	1eh		; nDIR | VOL | HID | SYS
+  1087    02EF- 0743                		btfss	ZERO
+  1088    02F0- 0B02                		goto	:next
+  1089                              		
+  1090    02F1- 0507                		bsf	MODE_DIR
+  1091    02F2-                     	:find
+  1092    02F2- 0C0E                		movlw	0eh
+  1093    02F3- 0029                		movwf	work1
+  1094    02F4-                     	:loop2
+  1095    02F4- 04A3                		bcf	PA0
+  1096    02F5- 09D4                		call	mmcread
+  1097                              		
+  1098    02F6- 05A3                		bsf	PA0
+  1099    02F7- 02E9                		decfsz	work1, 1
+  1100    02F8- 0AF4                		goto	:loop2
+  1101                              		
+  1102    02F9- 04A3                		bcf	PA0
+  1103    02FA- 09D4                		call	mmcread		; off = 1ah
+  1104    02FB- 020A                		movf	mmc_packet, 0
+  1105    02FC- 003A                		movwf	cur_cluster + 1
+  1106                              		
+  1107    02FD- 09D4                		call	mmcread		; off = 1bh
+  1108    02FE- 020A                		movf	mmc_packet, 0
+  1109    02FF- 0039                		movwf	cur_cluster
+  1110                              		
+  1111    0300- 0C04                		movlw	4
+  1112    0301- 0029                		movwf	work1
+  1113    0302-                     	:next				; to next entry
+  1114    0302- 04A3                		bcf	PA0
+  1115    0303- 09D4                		call	mmcread
+  1116                              		
+  1117    0304- 05A3                		bsf	PA0
+  1118    0305- 02E9                		decfsz	work1, 1
+  1119    0306- 0B02                		goto	:next
+  1120                              		
+  1121                              	;	bsf	PA0
+  1122    0307- 02E8                		decfsz	work0, 1
+  1123    0308- 0A47                		goto	:loop1
+  1124                              		
+  1125    0309- 04A3                		bcf	PA0
+  1126    030A- 09D4                		call	mmcread		;CRC
+  1127    030B- 09D4                		call	mmcread
+  1128    030C- 09A3                		call	mmcstop
+  1129                              		
+  1130    030D- 0219                		movf	cur_cluster, 0
+  1131    030E- 011A                		iorwf	cur_cluster + 1, 0
+  1132    030F- 0C53                		movlw	53h		; GPS*.* not found
+  1133    0310- 0643                		btfsc	ZERO
+  1134    0311- 0BD6                		goto	halt
+  1135                              		
+  1136    0312- 05A3                		bsf	PA0
+  1137    0313- 0707                		btfss	MODE_DIR
+  1138    0314- 0B19                		goto	waitdetect
+  1139                              		
+  1140    0315- 04A3                		bcf	PA0
+  1141    0316- 0984                		call	cluster2addr
+  1142                              		
+  1143    0317- 05A3                		bsf	PA0
+  1144    0318- 0A38                		goto	getrde
+  1145                              		
+  1146                              	;	bsf	PA0
+  1147    0319-                     	waitdetect
+  1148    0319- 0666                		btfsc	RX
+  1149    031A- 0B19                		goto	waitdetect
+  1150                              		
+  1151    031B- 0446                		bcf	MMCCS		; LED(MMCCS) turn on
+  1152                              		
+  1153                              	;	bsf	PA0
+  1154    031C-                     	waitdetect_error
+  1155    031C- 04A3                		bcf	PA0
+  1156    031D- 091D                		call	wait_rxn	; skip current packet
+  1157                              		
+  1158    031E- 0546                		bsf	MMCCS		; LED(MMCCS) turn off
+  1159                              		
+  1160    031F- 05A3                		bsf	PA0
+  1161    0320- 0727                		btfss	MODE_DETECT2LOG
+  1162    0321- 0B44                		goto	setupgps
+  1163                              		
+  1164                              	;	bsf	PA0
+  1165    0322-                     	:waitrx
+  1166    0322- 0666                		btfsc	RX
+  1167    0323- 0B22                		goto	:waitrx
+  1168                              		
+  1169    0324- 04A3                		bcf	PA0
+  1170    0325- 0927                		call	rsrecv_start
+  1171    0326- 092E                		call	rsrecv_body
+  1172    0327- 0929                		call	rswait		; stop-bit
+  1173                              		
+  1174    0328- 0208                		movf	work0, 0
+  1175    0329- 0FE0                		xorlw	0e0h
+  1176                              		
+  1177    032A- 05A3                		bsf	PA0
+  1178    032B- 0743                		btfss	ZERO
+  1179    032C- 0B1C                		goto	waitdetect_error	; data error
+  1180                              		
+  1181    032D- 0C14                		movlw	14h		; skip 19+1 bytes
+  1182    032E- 0031                		movwf	bytecount
+  1183    032F-                     	:loop
+  1184    032F- 04A3                		bcf	PA0
+  1185    0330- 0913                		call	wait_rx
+  1186                              		
+  1187    0331- 05A3                		bsf	PA0
+  1188    0332- 0666                		btfsc	RX
+  1189    0333- 0B22                		goto	:waitrx		; time out
+  1190                              		
+  1191    0334- 04A3                		bcf	PA0
+  1192    0335- 0927                		call	rsrecv_start
+  1193    0336- 092E                		call	rsrecv_body
+  1194    0337- 0929                		call	rswait		; stop-bit
+  1195                              		
+  1196    0338- 05A3                		bsf	PA0
+  1197    0339- 06E8                		btfsc	work0, 7
+  1198    033A- 0B1C                		goto	waitdetect_error	; data error
+  1199                              		
+  1200                              	;	bsf	PA0
+  1201    033B- 02F1                		decfsz	bytecount, 1
+  1202    033C- 0B2F                		goto	:loop
+  1203                              		
+  1204    033D- 0CFC                		movlw	0fch
+  1205    033E- 01C8                		addwf	work0, 0
+  1206    033F- 05A3                		bsf	PA0
+  1207    0340- 0703                		btfss	CARRY
+  1208    0341- 0B19                		goto	waitdetect	; satellites < 4
+  1209                              		
+  1210    0342- 04A3                		bcf	PA0
+  1211    0343- 091D                		call	wait_rxn	; skip current packet
+  1212                              		
+  1213    0344-                     	setupgps
+  1214    0344- 04A3                		bcf	PA0
+  1215                              		
+  1216    0345- 0CC0                		movlw	0c0h		; header
+  1217    0346- 0938                		call	rssend
+  1218    0347- 0CA3                		movlw	0a3h		; setup: periodical output-data items
+  1219    0348- 0938                		call	rssend
+  1220    0349- 0C8F                		movlw	8fh		; all items
+  1221    034A- 0938                		call	rssend
+  1222    034B- 0CEC                		movlw	0ech		; check-sum (XOR from header)
+  1223    034C- 0938                		call	rssend
+  1224    034D- 0CCA                		movlw	0cah		; terminator
+  1225    034E- 0938                		call	rssend
+  1226                              		
+  1227    034F- 05A3                		bsf	PA0
+  1228                              		
+  1229    0350-                     	cluster_loop
+  1230    0350- 04A3                		bcf	PA0
+  1231    0351- 0984                		call	cluster2addr
+  1232                              		
+  1233    0352- 0948                		call	clraddr
+  1234    0353- 0C02                		movlw	2		; 200h per sector
+  1235    0354- 0034                		movwf	addr + 2
+  1236                              		
+  1237    0355-                     	sector_loop
+  1238    0355- 04A3                		bcf	PA0
+  1239                              		
+  1240    0356- 09A1                		call	mmcstart
+  1241    0357- 0C58                		movlw	58h		; write block
+  1242    0358- 002A                		movwf	mmc_packet
+  1243    0359- 09B2                		call	mmccmd
+  1244                              		
+  1245    035A- 020A                		movf	mmc_packet, 0
+  1246    035B- 0C61                		movlw	61h		; data write failed
+  1247    035C- 0743                		btfss	ZERO
+  1248    035D- 0BD6                		goto	halt
+  1249                              		
+  1250    035E- 0CFF                		movlw	0ffh		; dummy data
+  1251    035F- 09E8                		call	mmcwrite
+  1252    0360- 0CFE                		movlw	0feh		; data start
+  1253    0361- 09E8                		call	mmcwrite
+  1254                              		
+  1255    0362- 0C02                		movlw	2		; remain bytes = 200h
+  1256    0363- 003B                		movwf	rem_byte
+  1257    0364- 007C                		clrf	rem_byte + 1
+  1258                              		
+  1259    0365- 05A3                		bsf	PA0
+  1260    0366-                     	:waitrx
+  1261    0366- 0666                		btfsc	RX
+  1262    0367- 0B66                		goto	:waitrx
+  1263                              		
+  1264    0368- 0CA0                		movlw	0a0h		; max 160bytes
+  1265    0369- 0031                		movwf	bytecount
+  1266    036A-                     	:loop
+  1267    036A- 04A3                		bcf	PA0
+  1268    036B- 0913                		call	wait_rx
+  1269                              		
+  1270    036C- 05A3                		bsf	PA0
+  1271    036D- 0666                		btfsc	RX
+  1272    036E- 0B81                		goto	fill_line	; time out
+  1273                              		
+  1274    036F- 04A3                		bcf	PA0
+  1275    0370- 0927                		call	rsrecv_start
+  1276                              		
+  1277    0371- 0C20                		movlw	20h		; ' '
+  1278    0372- 09E8                		call	mmcwrite
+  1279                              		
+  1280    0373- 092E                		call	rsrecv_body
+  1281                              	;	bcf	PA0
+  1282                              		
+  1283    0374- 0388                		swapf	work0, 0
+  1284    0375- 09DF                		call	mmcwrite_hex
+  1285    0376- 0208                		movf	work0, 0
+  1286    0377- 09DF                		call	mmcwrite_hex
+  1287                              		
+  1288    0378- 0C03                		movlw	3
+  1289    0379- 00BC                		subwf	rem_byte + 1, 1
+  1290    037A- 0703                		btfss	CARRY
+  1291    037B- 00FB                		decf	rem_byte, 1
+  1292                              		
+  1293                              	;	call	rswait		; STOP
+  1294                              		
+  1295    037C- 05A3                		bsf	PA0
+  1296    037D- 02F1                		decfsz	bytecount, 1
+  1297    037E- 0B6A                		goto	:loop
+  1298                              		
+  1299    037F- 04A3                		bcf	PA0
+  1300    0380- 091D                		call	wait_rxn
+  1301    0381-                     	fill_line
+  1302    0381- 04A3                		bcf	PA0
+  1303    0382- 0C0D                		movlw	0dh		; CR
+  1304    0383- 09E8                		call	mmcwrite
+  1305    0384- 0C0A                		movlw	0ah		; LF
+  1306    0385- 09E8                		call	mmcwrite
+  1307                              		
+  1308    0386- 0C04                		movlw	4		; '\r\n\r\n' in '\r\n--------\r\n'
+  1309    0387- 00BC                		subwf	rem_byte + 1, 1
+  1310    0388- 0703                		btfss	CARRY
+  1311    0389- 00FB                		decf	rem_byte, 1
+  1312    038A-                     	:loop
+  1313    038A- 04A3                		bcf	PA0
+  1314    038B- 0C2D                		movlw	2dh		; '-'
+  1315    038C- 09E8                		call	mmcwrite
+  1316                              		
+  1317    038D- 0C01                		movlw	1
+  1318    038E- 00BC                		subwf	rem_byte + 1, 1
+  1319    038F- 0703                		btfss	CARRY
+  1320    0390- 00FB                		decf	rem_byte, 1
+  1321                              		
+  1322    0391- 021B                		movf	rem_byte, 0
+  1323    0392- 011C                		iorwf	rem_byte + 1, 0
+  1324                              		
+  1325    0393- 05A3                		bsf	PA0
+  1326    0394- 0743                		btfss	ZERO
+  1327    0395- 0B8A                		goto	:loop
+  1328                              		
+  1329    0396- 04A3                		bcf	PA0
+  1330    0397- 0C0D                		movlw	0dh		; CR
+  1331    0398- 09E8                		call	mmcwrite
+  1332    0399- 0C0A                		movlw	0ah		; LF
+  1333    039A- 09E8                		call	mmcwrite
+  1334                              		
+  1335                              	;	bcf	PA0
+  1336    039B- 09E8                		call	mmcwrite	; CRC-1
+  1337    039C- 09E8                		call	mmcwrite	; CRC-2
+  1338    039D- 09C9                		call	waitwrite
+  1339    039E- 09A3                		call	mmcstop
+  1340                              		
+  1341    039F- 0C12                		movlw	addr
+  1342    03A0- 0967                		call	addaddr
+  1343                              		
+  1344    03A1- 090E                		call	wait250ms	; LED(MMCCS) turn off
+  1345                              		
+  1346    03A2- 05A3                		bsf	PA0
+  1347    03A3- 02F8                		decfsz	remain_sec, 1
+  1348    03A4- 0B55                		goto	sector_loop
+  1349                              		
+  1350    03A5-                     	nextcluster
+  1351    03A5- 04A3                		bcf	PA0
+  1352                              		
+  1353    03A6- 0948                		call	clraddr		; cluster to FAT-addr
+  1354    03A7- 0219                		movf	cur_cluster, 0
+  1355    03A8- 0034                		movwf	addr + 2
+  1356                              		
+  1357    03A9- 0403                		bcf	CARRY
+  1358    03AA- 0374                		rlf	addr + 2, 1
+  1359    03AB- 0373                		rlf	addr + 1, 1
+  1360                              		
+  1361    03AC- 0C30                		movlw	fataddr
+  1362    03AD- 095A                		call	setaddr
+  1363                              	;	clrf	FSR		; select bank-0
+  1364                              		
+  1365    03AE- 0C12                		movlw	addr
+  1366    03AF- 0967                		call	addaddr
+  1367                              		
+  1368    03B0- 09A1                		call	mmcstart
+  1369    03B1- 0C51                		movlw	51h		; read single block
+  1370    03B2- 002A                		movwf	mmc_packet
+  1371    03B3- 09B2                		call	mmccmd
+  1372                              		
+  1373    03B4- 020A                		movf	mmc_packet, 0
+  1374    03B5- 0C71                		movlw	71h		; FAT read failed
+  1375    03B6- 0743                		btfss	ZERO
+  1376    03B7- 0BD6                		goto	halt
+  1377                              		
+  1378    03B8- 09BF                		call	waitread
+  1379                              		
+  1380    03B9- 05A3                		bsf	PA0
+  1381                              		
+  1382    03BA- 021A                		movf	cur_cluster + 1, 0	; skip FAT entry
+  1383    03BB- 0029                		movwf	work1
+  1384    03BC- 0643                		btfsc	ZERO
+  1385    03BD- 0BC5                		goto	:exit2
+  1386    03BE- 0028                		movwf	work0
+  1387    03BF-                     	:loop2
+  1388    03BF- 04A3                		bcf	PA0
+  1389    03C0- 09D4                		call	mmcread
+  1390    03C1- 09D4                		call	mmcread
+  1391                              		
+  1392    03C2- 05A3                		bsf	PA0
+  1393    03C3- 02E8                		decfsz	work0, 1
+  1394    03C4- 0BBF                		goto	:loop2
+  1395    03C5-                     	:exit2
+  1396    03C5- 04A3                		bcf	PA0
+  1397                              		
+  1398    03C6- 09D4                		call	mmcread
+  1399    03C7- 020A                		movf	mmc_packet, 0
+  1400    03C8- 003A                		movwf	cur_cluster + 1
+  1401    03C9- 09D4                		call	mmcread
+  1402    03CA- 020A                		movf	mmc_packet, 0
+  1403    03CB- 0039                		movwf	cur_cluster
+  1404                              		
+  1405    03CC- 05A3                		bsf	PA0
+  1406                              		
+  1407    03CD- 0209                		movf	work1, 0	; skip till end of sector
+  1408    03CE- 0FFF                		xorlw	0ffh
+  1409    03CF- 0643                		btfsc	ZERO
+  1410    03D0- 0BD8                		goto	:exit3
+  1411    03D1- 0028                		movwf	work0
+  1412    03D2-                     	:loop3
+  1413    03D2- 04A3                		bcf	PA0
+  1414    03D3- 09D4                		call	mmcread
+  1415    03D4- 09D4                		call	mmcread
+  1416                              		
+  1417    03D5- 05A3                		bsf	PA0
+  1418    03D6- 02E8                		decfsz	work0, 1
+  1419    03D7- 0BD2                		goto	:loop3
+  1420    03D8-                     	:exit3
+  1421                              		
+  1422    03D8- 04A3                		bcf	PA0
+  1423                              		
+  1424    03D9- 09D4                		call	mmcread		;CRC
+  1425    03DA- 09D4                		call	mmcread
+  1426    03DB- 09A3                		call	mmcstop
+  1427                              		
+  1428    03DC- 05A3                		bsf	PA0
+  1429                              		
+  1430    03DD- 0239                		movf	cur_cluster, 1
+  1431    03DE- 0743                		btfss	ZERO
+  1432    03DF- 0BE7                		goto	:next
+  1433    03E0- 021A                		movf	cur_cluster + 1, 0
+  1434    03E1- 0EFE                		andlw	0feh
+  1435    03E2- 0743                		btfss	ZERO
+  1436    03E3- 0BE7                		goto	:next
+  1437                              		
+  1438    03E4- 0C72                		movlw	72h		; cluster-0 or 1 found in FAT-chain
+  1439                              					; (may overwrite FAT)
+  1440    03E5- 04A3                		bcf	PA0
+  1441    03E6- 0BD6                		goto	halt
+  1442    03E7-                     	:next
+  1443                              	;	bsf	PA0
+  1444    03E7- 0C01                		movlw	1
+  1445    03E8- 01D9                		addwf	cur_cluster, 0
+  1446    03E9- 0703                		btfss	CARRY
+  1447    03EA- 0B50                		goto	cluster_loop	; < 0ff00h
+  1448    03EB- 0C09                		movlw	9
+  1449    03EC- 01DA                		addwf	cur_cluster + 1, 0
+  1450    03ED- 0643                		btfsc	ZERO
+  1451    03EE- 0BF4                		goto	:badcluster	; == 0fff7h
+  1452    03EF- 0703                		btfss	CARRY
+  1453    03F0- 0B50                		goto	cluster_loop
+  1454                              		
+  1455    03F1- 0C20                		movlw	20h		; end of file
+  1456    03F2- 04A3                		bcf	PA0
+  1457    03F3- 0BD6                		goto	halt
+  1458    03F4-                     	:badcluster
+  1459    03F4- 0C73                		movlw	73h
+  1460    03F5- 04A3                		bcf	PA0
+  1461    03F6- 0BD6                		goto	halt
+  1462
+  1463
+  1464
+
+
+						    ===== Errors: 0 =====

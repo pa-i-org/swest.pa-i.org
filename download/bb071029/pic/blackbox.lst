@@ -1,0 +1,2071 @@
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001         list p=16f648a
+                      00002         #include "p16f648a.inc"
+                      00001         LIST
+                      00002 ; P16F648A.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00264         LIST
+2007   3F11           00003         __config        _BOREN_OFF & _CP_OFF & _DATA_CP_OFF & _PWRTE_ON & _WDT_OFF & _LVP_OFF & _MCLRE_O
+                            FF & _INTOSC_OSC_CLKOUT
+                      00004 
+  00000002            00005 LCD_RS  equ     2
+  00000003            00006 LCD_E   equ     3
+  00000000            00007 SCAN0   equ     0
+  00000001            00008 SCAN1   equ     1
+  00000004            00009 SCAN2   equ     4
+                      00010 
+  00000007            00011 KEYNULL equ     7
+  00000006            00012 KEYCMD  equ     6
+  00000005            00013 KEYCUR  equ     5
+  00000004            00014 KEYNUM  equ     4
+  00000000            00015 KEYENT  equ     0
+  00000001            00016 KEYCAN  equ     1
+  00000002            00017 KEYA    equ     2
+  00000003            00018 KEYS    equ     3
+  00000000            00019 KEYU    equ     0
+  00000001            00020 KEYL    equ     1
+  00000002            00021 KEYR    equ     2
+  00000003            00022 KEYD    equ     3
+                      00023 
+                      00024 
+  0000003E            00025 work0   equ     0x3e
+  0000003F            00026 work1   equ     0x3f
+                      00027 
+  00000040            00028 disp_ah equ     0x40
+  00000041            00029 disp_al equ     0x41
+  00000042            00030 disp_bh equ     0x42
+  00000043            00031 disp_bl equ     0x43
+  00000044            00032 disp_ch equ     0x44
+  00000045            00033 disp_cl equ     0x45
+  00000046            00034 disp_dh equ     0x46
+  00000047            00035 disp_dl equ     0x47
+                      00036 
+  00000048            00037 disp_ai equ     0x48
+  00000049            00038 disp_bi equ     0x49
+  0000004A            00039 disp_ci equ     0x4a
+  0000004B            00040 disp_di equ     0x4b
+                      00041 
+  0000004C            00042 disp_c  equ     0x4c
+  0000004F            00043 work2   equ     0x4f
+                      00044 
+  00000050            00045 input_ah        equ     0x50
+  00000051            00046 input_al        equ     0x51
+  00000052            00047 input_bh        equ     0x52
+  00000053            00048 input_bl        equ     0x53
+  00000054            00049 input_ch        equ     0x54
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+  00000055            00050 input_cl        equ     0x55
+  00000056            00051 input_dh        equ     0x56
+  00000057            00052 input_dl        equ     0x57
+                      00053 
+  00000058            00054 acch    equ     0x58
+  00000059            00055 accl    equ     0x59
+  0000005A            00056 acctmph equ     0x5a
+  0000005B            00057 acctmpl equ     0x5b
+                      00058 
+  0000005C            00059 menu0   equ     0x5c
+  0000005D            00060 menu1   equ     0x5d
+  0000005E            00061 menu2   equ     0x5e
+  0000005F            00062 menu3   equ     0x5f
+                      00063 
+  00000060            00064 type2count      equ     60h
+  00000061            00065 type3count      equ     61h
+  00000062            00066 type4count      equ     62h
+  00000063            00067 type5count      equ     63h
+  00000064            00068 type6count      equ     64h
+                      00069 
+  00000068            00070 type6a  equ     68h
+  00000069            00071 type6b  equ     69h
+  0000006A            00072 type6c  equ     6ah
+  0000006B            00073 type6d  equ     6bh
+                      00074 
+                      00075 
+0000                  00076         org     0
+0000   2C75           00077         goto    init
+                      00078 
+0005                  00079         org     5
+                      00080 
+0005                  00081 typetable
+0005   01C0           00082         clrf    disp_ah
+0006   01C1           00083         clrf    disp_al
+0007   01C2           00084         clrf    disp_bh
+0008   01C3           00085         clrf    disp_bl
+0009   01C4           00086         clrf    disp_ch
+000A   01C5           00087         clrf    disp_cl
+000B   01C6           00088         clrf    disp_dh
+000C   01C7           00089         clrf    disp_dl
+000D   01C8           00090         clrf    disp_ai
+000E   01C9           00091         clrf    disp_bi
+000F   01CA           00092         clrf    disp_ci
+0010   01CB           00093         clrf    disp_di
+0011   01D0           00094         clrf    input_ah
+0012   01D1           00095         clrf    input_al
+0013   01D2           00096         clrf    input_bh
+0014   01D3           00097         clrf    input_bl
+0015   01D4           00098         clrf    input_ch
+0016   01D5           00099         clrf    input_cl
+0017   01D6           00100         clrf    input_dh
+0018   01D7           00101         clrf    input_dl
+0019   0782           00102         addwf   PCL, 1
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00103         
+001A   0000           00104         nop
+001B   2B46           00105         goto    type1
+001C   2B8E           00106         goto    type2
+001D   2BCD           00107         goto    type3
+001E   2BE3           00108         goto    type4
+001F   2C3D           00109         goto    type5
+0020   2C55           00110         goto    type6
+                      00111 
+                      00112 
+0021                  00113 type5sub
+0021   3903           00114         andlw   3
+0022   00BE           00115         movwf   work0
+0023   073E           00116         addwf   work0, 0
+0024   0782           00117         addwf   PCL, 1
+                      00118         
+0025   0848           00119         movf    disp_ai, 0
+0026   0008           00120         return
+0027   0849           00121         movf    disp_bi, 0
+0028   0008           00122         return
+0029   084A           00123         movf    disp_ci, 0
+002A   0008           00124         return
+002B   084B           00125         movf    disp_di, 0
+002C   0008           00126         return
+                      00127 
+                      00128 
+002D                  00129 acc_add         ; acc += W
+002D   07D9           00130         addwf   accl, 1
+002E   1803           00131         btfsc   STATUS, C
+002F   0AD8           00132         incf    acch, 1
+0030   3400           00133         retlw   0
+                      00134 
+0031                  00135 acc_sub         ; acc -= W
+0031   02D9           00136         subwf   accl, 1
+0032   1C03           00137         btfss   STATUS, C
+0033   03D8           00138         decf    acch, 1
+0034   3400           00139         retlw   0
+                      00140 
+0035                  00141 acc_mul         ; acc += work0 * work1
+0035   083E           00142         movf    work0, 0
+0036   00DA           00143         movwf   acctmph
+0037   01DB           00144         clrf    acctmpl
+0038                  00145 acc_mul_loop
+0038   083F           00146         movf    work1, 0
+0039   1903           00147         btfsc   STATUS, Z
+003A   3400           00148         retlw   0
+                      00149         
+003B   1003           00150         bcf     STATUS, C
+003C   0CDA           00151         rrf     acctmph, 1
+003D   0CDB           00152         rrf     acctmpl, 1
+                      00153         
+003E   1003           00154         bcf     STATUS, C
+003F   0DBF           00155         rlf     work1, 1
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0040   1C03           00156         btfss   STATUS, C
+0041   2838           00157         goto    acc_mul_loop
+                      00158         
+0042   085A           00159         movf    acctmph, 0
+0043   07D8           00160         addwf   acch, 1
+                      00161         
+0044   085B           00162         movf    acctmpl, 0
+0045   07D9           00163         addwf   accl, 1
+0046   1803           00164         btfsc   STATUS, C
+0047   0AD8           00165         incf    acch, 1
+0048   2838           00166         goto    acc_mul_loop
+                      00167 
+                      00168 
+0049                  00169 wait1ms
+0049   01BE           00170         clrf    work0
+004A                  00171 wait1ms_0
+004A   0000           00172         nop
+004B   0000           00173         nop
+004C   0BBE           00174         decfsz  work0, 1
+004D   284A           00175         goto    wait1ms_0               ;4uS
+004E   3400           00176         retlw   0
+                      00177 
+                      00178 
+004F                  00179 wait50ms
+004F   3032           00180         movlw   32h
+0050   00BF           00181         movwf   work1
+0051                  00182 wait50ms_0
+0051   2049           00183         call    wait1ms
+0052   0BBF           00184         decfsz  work1, 1
+0053   2857           00185         goto    wait200ms_0
+0054   3400           00186         retlw   0
+                      00187 
+                      00188 
+0055                  00189 wait200ms
+0055   30C8           00190         movlw   0c8h
+0056   00BF           00191         movwf   work1
+0057                  00192 wait200ms_0
+0057   2049           00193         call    wait1ms
+0058   0BBF           00194         decfsz  work1, 1
+0059   2857           00195         goto    wait200ms_0
+005A   3400           00196         retlw   0
+                      00197 
+                      00198 
+005B                  00199 write_vpattern
+005B   00BF           00200         movwf   work1
+005C   0E3F           00201         swapf   work1, 0
+005D   20CF           00202         call    write_lcd8
+005E   083F           00203         movf    work1, 0
+005F   20CF           00204         call    write_lcd8
+                      00205         
+0060   0E3F           00206         swapf   work1, 0
+0061   20CF           00207         call    write_lcd8
+0062   083F           00208         movf    work1, 0
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0063   20CF           00209         call    write_lcd8
+                      00210         
+0064   0E3F           00211         swapf   work1, 0
+0065   20CF           00212         call    write_lcd8
+0066   083F           00213         movf    work1, 0
+0067   20CF           00214         call    write_lcd8
+                      00215         
+0068   0E3F           00216         swapf   work1, 0
+0069   20CF           00217         call    write_lcd8
+006A   083F           00218         movf    work1, 0
+006B   20CF           00219         call    write_lcd8
+                      00220         
+006C   0E3F           00221         swapf   work1, 0
+006D   20CF           00222         call    write_lcd8
+006E   083F           00223         movf    work1, 0
+006F   20CF           00224         call    write_lcd8
+                      00225         
+0070   0E3F           00226         swapf   work1, 0
+0071   20CF           00227         call    write_lcd8
+0072   083F           00228         movf    work1, 0
+0073   20CF           00229         call    write_lcd8
+                      00230         
+0074   0E3F           00231         swapf   work1, 0
+0075   20CF           00232         call    write_lcd8
+0076   083F           00233         movf    work1, 0
+0077   20CF           00234         call    write_lcd8
+                      00235         
+0078   0E3F           00236         swapf   work1, 0
+0079   20CF           00237         call    write_lcd8
+007A   083F           00238         movf    work1, 0
+007B   20CF           00239         call    write_lcd8
+                      00240         
+007C   3400           00241         retlw   0
+                      00242 
+                      00243 
+007D                  00244 write_hex
+007D   00BF           00245         movwf   work1
+007E   39F0           00246         andlw   0f0h
+007F   3E60           00247         addlw   60h
+0080   1C03           00248         btfss   STATUS, C
+0081   2889           00249         goto    write_hex_hn
+0082                  00250 write_hex_ha
+0082   3060           00251         movlw   60h
+0083   20CF           00252         call    write_lcd8
+                      00253         
+0084   083F           00254         movf    work1, 0
+0085   39F0           00255         andlw   0f0h
+0086   3E70           00256         addlw   70h
+0087   20CF           00257         call    write_lcd8
+0088   288E           00258         goto    write_hex_l
+0089                  00259 write_hex_hn
+0089   3030           00260         movlw   30h
+008A   20CF           00261         call    write_lcd8
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00262         
+008B   083F           00263         movf    work1, 0
+008C   39F0           00264         andlw   0f0h
+008D   20CF           00265         call    write_lcd8
+                      00266         
+008E                  00267 write_hex_l
+008E   0E3F           00268         swapf   work1, 0
+008F   39F0           00269         andlw   0f0h
+0090   3E60           00270         addlw   60h
+0091   1C03           00271         btfss   STATUS, C
+0092   2899           00272         goto    write_hex_ln
+0093                  00273 write_hex_la
+0093   3060           00274         movlw   60h
+0094   20CF           00275         call    write_lcd8
+                      00276         
+0095   0E3F           00277         swapf   work1, 0
+0096   39F0           00278         andlw   0f0h
+0097   3E70           00279         addlw   70h
+0098   28CF           00280         goto    write_lcd8
+0099                  00281 write_hex_ln
+0099   3030           00282         movlw   30h
+009A   20CF           00283         call    write_lcd8
+                      00284         
+009B   0E3F           00285         swapf   work1, 0
+009C   39F0           00286         andlw   0f0h
+009D   28CF           00287         goto    write_lcd8
+                      00288 
+                      00289 
+009E                  00290 write_dec
+009E   01DA           00291         clrf    acctmph
+009F                  00292 write_dec_loop
+009F   0ADA           00293         incf    acctmph, 1
+00A0   00DB           00294         movwf   acctmpl
+00A1   3EF6           00295         addlw   0f6h
+00A2   1803           00296         btfsc   STATUS, C
+00A3   289F           00297         goto    write_dec_loop
+                      00298         
+00A4   085A           00299         movf    acctmph, 0
+00A5   3E2F           00300         addlw   2fh
+00A6   20CB           00301         call    write_lcd
+                      00302         
+00A7   085B           00303         movf    acctmpl, 0
+00A8   3E30           00304         addlw   30h
+00A9   28CB           00305         goto    write_lcd
+                      00306 
+                      00307 
+00AA                  00308 write_acc
+00AA   302B           00309         movlw   2bh
+00AB   1FD8           00310         btfss   acch, 7
+00AC   28B3           00311         goto    write_acc_sign
+                      00312         
+00AD   30FF           00313         movlw   0ffh
+00AE   06D8           00314         xorwf   acch, 1
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00AF   06D9           00315         xorwf   accl, 1
+                      00316         
+00B0   3001           00317         movlw   1
+00B1   202D           00318         call    acc_add
+                      00319         
+00B2   302D           00320         movlw   2dh
+00B3                  00321 write_acc_sign
+00B3   20CB           00322         call    write_lcd
+00B4   302F           00323         movlw   2fh
+00B5   00DA           00324         movwf   acctmph
+00B6                  00325 write_acc_loop1
+00B6   0ADA           00326         incf    acctmph, 1
+00B7   3064           00327         movlw   64h
+00B8   2031           00328         call    acc_sub
+00B9   1FD8           00329         btfss   acch, 7
+00BA   28B6           00330         goto    write_acc_loop1
+                      00331         
+00BB   085A           00332         movf    acctmph, 0
+00BC   20CB           00333         call    write_lcd
+                      00334         
+00BD   3064           00335         movlw   64h
+00BE   202D           00336         call    acc_add
+00BF   302F           00337         movlw   2fh
+00C0   00DA           00338         movwf   acctmph
+00C1                  00339 write_acc_loop2
+00C1   0ADA           00340         incf    acctmph, 1
+00C2   300A           00341         movlw   0ah
+00C3   2031           00342         call    acc_sub
+00C4   1FD8           00343         btfss   acch, 7
+00C5   28C1           00344         goto    write_acc_loop2
+                      00345         
+00C6   085A           00346         movf    acctmph, 0
+00C7   20CB           00347         call    write_lcd
+                      00348         
+00C8   0859           00349         movf    accl, 0
+00C9   3E3A           00350         addlw   3ah
+00CA   28CB           00351         goto    write_lcd
+                      00352 
+                      00353 
+00CB                  00354 write_lcd
+00CB   00BF           00355         movwf   work1
+00CC   0E3F           00356         swapf   work1, 0
+00CD   20CF           00357         call    write_lcd8
+00CE   083F           00358         movf    work1, 0
+00CF                  00359 write_lcd8
+00CF   0086           00360         movwf   PORTB
+00D0   1683           00361         bsf     STATUS, RP0
+00D1   30B0           00362         movlw   0b0h                    ; PORTB: IOIIOOOO
+00D2   0086           00363         movwf   PORTB
+00D3   1283           00364         bcf     STATUS, RP0
+                      00365         
+00D4   1585           00366         bsf     PORTA, LCD_E
+00D5   0000           00367         nop                     ; 1us
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00D6   1185           00368         bcf     PORTA, LCD_E
+                      00369         
+00D7   300A           00370         movlw   0ah             ; 50us
+00D8   00BE           00371         movwf   work0
+00D9                  00372 write_lcd8_wait
+00D9   0000           00373         nop
+00DA   0000           00374         nop
+00DB   0BBE           00375         decfsz  work0, 1
+00DC   28D9           00376         goto    write_lcd8_wait
+                      00377         
+00DD   3400           00378         retlw   0
+                      00379 
+                      00380 
+00DE                  00381 keyscan
+00DE   30C4           00382         movlw   0c4h                    ; PORTA: 11000100
+00DF   0085           00383         movwf   PORTA
+                      00384         
+00E0   1683           00385         bsf     STATUS, RP0
+00E1   1005           00386         bcf     PORTA, SCAN0
+00E2   1485           00387         bsf     PORTA, SCAN1
+00E3   1605           00388         bsf     PORTA, SCAN2
+00E4   30BF           00389         movlw   0bfh                    ; PORTB: IOIIIIII
+00E5   0086           00390         movwf   PORTB
+00E6   1283           00391         bcf     STATUS, RP0
+                      00392         
+00E7   2049           00393         call    wait1ms
+00E8   1C06           00394         btfss   PORTB, 0
+00E9   3422           00395         retlw   22h             ;KEYL
+00EA   1C86           00396         btfss   PORTB, 1
+00EB   3428           00397         retlw   28h             ;KEYD
+00EC   1D06           00398         btfss   PORTB, 2
+00ED   3417           00399         retlw   17h
+00EE   1D86           00400         btfss   PORTB, 3
+00EF   3444           00401         retlw   44h             ;KEYA
+00F0   1E06           00402         btfss   PORTB, 4
+00F1   3414           00403         retlw   14h
+00F2   1E86           00404         btfss   PORTB, 5
+00F3   3411           00405         retlw   11h
+                      00406         
+00F4   1683           00407         bsf     STATUS, RP0
+00F5   1405           00408         bsf     PORTA, SCAN0
+00F6   1085           00409         bcf     PORTA, SCAN1
+00F7   1283           00410         bcf     STATUS, RP0
+                      00411         
+00F8   2049           00412         call    wait1ms
+00F9   1C06           00413         btfss   PORTB, 0
+00FA   3441           00414         retlw   41h             ;KEYENT
+00FB   1C86           00415         btfss   PORTB, 1
+00FC   3442           00416         retlw   42h             ;KEYC
+00FD   1D06           00417         btfss   PORTB, 2
+00FE   3418           00418         retlw   18h
+00FF   1D86           00419         btfss   PORTB, 3
+0100   3410           00420         retlw   10h
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0101   1E06           00421         btfss   PORTB, 4
+0102   3415           00422         retlw   15h
+0103   1E86           00423         btfss   PORTB, 5
+0104   3412           00424         retlw   12h
+                      00425         
+0105   1683           00426         bsf     STATUS, RP0
+0106   1485           00427         bsf     PORTA, SCAN1
+0107   1205           00428         bcf     PORTA, SCAN2
+0108   1283           00429         bcf     STATUS, RP0
+                      00430         
+0109   2049           00431         call    wait1ms
+010A   1C06           00432         btfss   PORTB, 0
+010B   3421           00433         retlw   21h             ;KEYU
+010C   1C86           00434         btfss   PORTB, 1
+010D   3424           00435         retlw   24h             ;KEYR
+010E   1D06           00436         btfss   PORTB, 2
+010F   3419           00437         retlw   19h
+0110   1D86           00438         btfss   PORTB, 3
+0111   3448           00439         retlw   48h             ;KEYS
+0112   1E06           00440         btfss   PORTB, 4
+0113   3416           00441         retlw   16h
+0114   1E86           00442         btfss   PORTB, 5
+0115   3413           00443         retlw   13h
+                      00444         
+0116   1683           00445         bsf     STATUS, RP0
+0117   1005           00446         bcf     PORTA, SCAN0
+0118   1085           00447         bcf     PORTA, SCAN1
+0119   1283           00448         bcf     STATUS, RP0
+011A   3480           00449         retlw   80h             ; KEYNULL
+                      00450 
+                      00451 
+011B                  00452 waitkeyreleaseloop
+011B   20DE           00453         call    keyscan
+011C   3980           00454         andlw   80h
+011D   1903           00455         btfsc   STATUS, Z
+011E                  00456 waitkey
+011E   01BF           00457         clrf    work1
+011F   0ABF           00458         incf    work1, 1
+0120   1E3F           00459         btfss   work1, 4
+0121   291B           00460         goto    waitkeyreleaseloop
+0122                  00461 waitkeyloop
+0122   20DE           00462         call    keyscan
+0123   00BE           00463         movwf   work0
+0124   1BBE           00464         btfsc   work0, 7
+0125   2922           00465         goto    waitkeyloop
+                      00466         
+0126   3A41           00467         xorlw   41h
+0127   1D03           00468         btfss   STATUS, Z
+0128   2933           00469         goto    waitkeyreturn
+                      00470         
+0129   01CF           00471         clrf    work2
+012A                  00472 waitkeyenter
+012A   204F           00473         call    wait50ms
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+012B   20DE           00474         call    keyscan
+012C   3A41           00475         xorlw   41h
+012D   1D03           00476         btfss   STATUS, Z
+012E   3441           00477         retlw   41h
+012F   0ACF           00478         incf    work2, 1
+0130   1ECF           00479         btfss   work2, 5
+0131   292A           00480         goto    waitkeyenter
+0132   3480           00481         retlw   80h
+                      00482         
+0133                  00483 waitkeyreturn
+0133   083E           00484         movf    work0, 0
+0134   0008           00485         return
+                      00486 
+                      00487 
+0135                  00488 inputkey
+0135   211E           00489         call    waitkey
+0136   00BE           00490         movwf   work0
+0137   390F           00491         andlw   0fh
+0138   1A3E           00492         btfsc   work0, KEYNUM
+0139   0008           00493         return
+013A   1BBE           00494         btfsc   work0, 7
+013B   294A           00495         goto    inputkeymenu
+013C   083E           00496         movf    work0, 0
+013D   3A42           00497         xorlw   42h
+013E   1903           00498         btfsc   STATUS, Z
+013F   3420           00499         retlw   20h             ; <
+0140   3A60           00500         xorlw   60h
+0141   1903           00501         btfsc   STATUS, Z
+0142   3420           00502         retlw   20h             ; <
+0143   3A03           00503         xorlw   3
+0144   1903           00504         btfsc   STATUS, Z
+0145   3440           00505         retlw   40h             ; ^
+0146   3A05           00506         xorlw   5
+0147   1903           00507         btfsc   STATUS, Z
+0148   3410           00508         retlw   10h             ; >
+0149   2935           00509         goto    inputkey
+014A                  00510 inputkeymenu
+014A   22A0           00511         call    mode_menu
+014B   3800           00512         iorlw   0
+014C   1903           00513         btfsc   STATUS, Z
+014D   3480           00514         retlw   80h
+014E   2805           00515         goto    typetable
+                      00516 
+                      00517 
+014F                  00518 mode_result
+014F   1105           00519         bcf     PORTA, LCD_RS
+0150   300C           00520         movlw   0ch             ; display-on cursor-off blink-off
+0151   20CB           00521         call    write_lcd
+0152   3001           00522         movlw   1               ; clear-all
+0153   20CB           00523         call    write_lcd
+0154   2055           00524         call    wait200ms
+                      00525         
+0155   1505           00526         bsf     PORTA, LCD_RS
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0156   3028           00527         movlw   28h
+0157   20CB           00528         call    write_lcd
+0158   302D           00529         movlw   2dh
+0159   20CB           00530         call    write_lcd
+015A   084C           00531         movf    disp_c, 0
+015B   209E           00532         call    write_dec
+015C   3029           00533         movlw   29h
+015D   20CB           00534         call    write_lcd
+                      00535         
+015E   0848           00536         movf    disp_ai, 0
+015F   209E           00537         call    write_dec
+0160   3020           00538         movlw   20h
+0161   20CB           00539         call    write_lcd
+0162   0849           00540         movf    disp_bi, 0
+0163   209E           00541         call    write_dec
+0164   3020           00542         movlw   20h
+0165   20CB           00543         call    write_lcd
+0166   084A           00544         movf    disp_ci, 0
+0167   209E           00545         call    write_dec
+0168   3020           00546         movlw   20h
+0169   20CB           00547         call    write_lcd
+016A   084B           00548         movf    disp_di, 0
+016B   209E           00549         call    write_dec
+016C   3020           00550         movlw   20h
+016D   20CB           00551         call    write_lcd
+                      00552         
+016E   1105           00553         bcf     PORTA, LCD_RS
+016F   30C0           00554         movlw   0c0h            ; DDRAM=40h
+0170   20CB           00555         call    write_lcd
+0171   1505           00556         bsf     PORTA, LCD_RS
+                      00557         
+0172   0840           00558         movf    disp_ah, 0
+0173   00D8           00559         movwf   acch
+0174   0841           00560         movf    disp_al, 0
+0175   00D9           00561         movwf   accl
+0176   20AA           00562         call    write_acc
+                      00563         
+0177   0842           00564         movf    disp_bh, 0
+0178   00D8           00565         movwf   acch
+0179   0843           00566         movf    disp_bl, 0
+017A   00D9           00567         movwf   accl
+017B   20AA           00568         call    write_acc
+                      00569         
+017C   0844           00570         movf    disp_ch, 0
+017D   00D8           00571         movwf   acch
+017E   0845           00572         movf    disp_cl, 0
+017F   00D9           00573         movwf   accl
+0180   20AA           00574         call    write_acc
+                      00575         
+0181   0846           00576         movf    disp_dh, 0
+0182   00D8           00577         movwf   acch
+0183   0847           00578         movf    disp_dl, 0
+0184   00D9           00579         movwf   accl
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0185   20AA           00580         call    write_acc
+                      00581         
+0186                  00582 mode_result_loop
+0186   211E           00583         call    waitkey
+0187   3A28           00584         xorlw   28h
+0188   1903           00585         btfsc   STATUS, Z
+0189   2992           00586         goto    mode_input
+018A   3AA8           00587         xorlw   0a8h
+018B   1D03           00588         btfss   STATUS, Z
+018C   2986           00589         goto    mode_result_loop
+                      00590         
+018D   22A0           00591         call    mode_menu
+018E   3800           00592         iorlw   0
+018F   1903           00593         btfsc   STATUS, Z
+0190   294F           00594         goto    mode_result
+0191   2805           00595         goto    typetable
+                      00596 
+                      00597 
+0192                  00598 mode_input
+0192   1105           00599         bcf     PORTA, LCD_RS
+0193   300F           00600         movlw   0fh             ; display-on cursor-on blink-on
+0194   20CB           00601         call    write_lcd
+0195   3001           00602         movlw   1               ; clear-all
+0196   20CB           00603         call    write_lcd
+0197   2055           00604         call    wait200ms
+                      00605         
+0198   1505           00606         bsf     PORTA, LCD_RS
+0199   3028           00607         movlw   28h
+019A   20CB           00608         call    write_lcd
+019B   302D           00609         movlw   2dh
+019C   20CB           00610         call    write_lcd
+019D   084C           00611         movf    disp_c, 0
+019E   3EFF           00612         addlw   0ffh
+019F   1C03           00613         btfss   STATUS, C
+01A0   294F           00614         goto    mode_result
+01A1   209E           00615         call    write_dec
+01A2   3029           00616         movlw   29h
+01A3   20CB           00617         call    write_lcd
+01A4   3049           00618         movlw   49h
+01A5   20CB           00619         call    write_lcd
+01A6   306E           00620         movlw   6eh
+01A7   20CB           00621         call    write_lcd
+01A8   3070           00622         movlw   70h
+01A9   20CB           00623         call    write_lcd
+01AA   3075           00624         movlw   75h
+01AB   20CB           00625         call    write_lcd
+01AC   3074           00626         movlw   74h
+01AD   20CB           00627         call    write_lcd
+                      00628         
+01AE   1105           00629         bcf     PORTA, LCD_RS
+01AF   30C0           00630         movlw   0c0h            ; DDRAM=40h
+01B0   20CB           00631         call    write_lcd
+01B1   1505           00632         bsf     PORTA, LCD_RS
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00633         
+01B2   0850           00634         movf    input_ah, 0
+01B3   3E30           00635         addlw   30h
+01B4   20CB           00636         call    write_lcd
+01B5   0851           00637         movf    input_al, 0
+01B6   3E30           00638         addlw   30h
+01B7   20CB           00639         call    write_lcd
+01B8   3020           00640         movlw   20h
+01B9   20CB           00641         call    write_lcd
+                      00642         
+01BA   0852           00643         movf    input_bh, 0
+01BB   3E30           00644         addlw   30h
+01BC   20CB           00645         call    write_lcd
+01BD   0853           00646         movf    input_bl, 0
+01BE   3E30           00647         addlw   30h
+01BF   20CB           00648         call    write_lcd
+01C0   3020           00649         movlw   20h
+01C1   20CB           00650         call    write_lcd
+                      00651         
+01C2   0854           00652         movf    input_ch, 0
+01C3   3E30           00653         addlw   30h
+01C4   20CB           00654         call    write_lcd
+01C5   0855           00655         movf    input_cl, 0
+01C6   3E30           00656         addlw   30h
+01C7   20CB           00657         call    write_lcd
+01C8   3020           00658         movlw   20h
+01C9   20CB           00659         call    write_lcd
+                      00660         
+01CA   0856           00661         movf    input_dh, 0
+01CB   3E30           00662         addlw   30h
+01CC   20CB           00663         call    write_lcd
+01CD   0857           00664         movf    input_dl, 0
+01CE   3E30           00665         addlw   30h
+01CF   20CB           00666         call    write_lcd
+01D0   3020           00667         movlw   20h
+01D1   20CB           00668         call    write_lcd
+                      00669         
+01D2   304F           00670         movlw   4fh
+01D3   20CB           00671         call    write_lcd
+01D4   306B           00672         movlw   6bh
+01D5   20CB           00673         call    write_lcd
+01D6                  00674 mode_input_ah
+01D6   1105           00675         bcf     PORTA, LCD_RS
+01D7   30C0           00676         movlw   0c0h            ; DDRAM=40h
+01D8   20CB           00677         call    write_lcd
+01D9   1505           00678         bsf     PORTA, LCD_RS
+                      00679         
+01DA   2135           00680         call    inputkey
+01DB   00BE           00681         movwf   work0
+01DC   1BBE           00682         btfsc   work0, 7
+01DD   2992           00683         goto    mode_input
+01DE   1B3E           00684         btfsc   work0, 6
+01DF   294F           00685         goto    mode_result
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01E0   1ABE           00686         btfsc   work0, 5
+01E1   2A5E           00687         goto    mode_input_ok
+01E2   1A3E           00688         btfsc   work0, 4
+01E3   29E7           00689         goto    mode_input_al
+                      00690         
+01E4   00D0           00691         movwf   input_ah
+01E5   3E30           00692         addlw   30h
+01E6   20CB           00693         call    write_lcd
+01E7                  00694 mode_input_al
+01E7   1105           00695         bcf     PORTA, LCD_RS
+01E8   30C1           00696         movlw   0c1h            ; DDRAM=41h
+01E9   20CB           00697         call    write_lcd
+01EA   1505           00698         bsf     PORTA, LCD_RS
+                      00699         
+01EB   2135           00700         call    inputkey
+01EC   00BE           00701         movwf   work0
+01ED   1BBE           00702         btfsc   work0, 7
+01EE   2992           00703         goto    mode_input
+01EF   1B3E           00704         btfsc   work0, 6
+01F0   294F           00705         goto    mode_result
+01F1   1ABE           00706         btfsc   work0, 5
+01F2   29D6           00707         goto    mode_input_ah
+01F3   1A3E           00708         btfsc   work0, 4
+01F4   29F8           00709         goto    mode_input_bh
+                      00710         
+01F5   00D1           00711         movwf   input_al
+01F6   3E30           00712         addlw   30h
+01F7   20CB           00713         call    write_lcd
+01F8                  00714 mode_input_bh
+01F8   1105           00715         bcf     PORTA, LCD_RS
+01F9   30C3           00716         movlw   0c3h            ; DDRAM=43h
+01FA   20CB           00717         call    write_lcd
+01FB   1505           00718         bsf     PORTA, LCD_RS
+                      00719         
+01FC   2135           00720         call    inputkey
+01FD   00BE           00721         movwf   work0
+01FE   1BBE           00722         btfsc   work0, 7
+01FF   2992           00723         goto    mode_input
+0200   1B3E           00724         btfsc   work0, 6
+0201   294F           00725         goto    mode_result
+0202   1ABE           00726         btfsc   work0, 5
+0203   29E7           00727         goto    mode_input_al
+0204   1A3E           00728         btfsc   work0, 4
+0205   2A09           00729         goto    mode_input_bl
+                      00730         
+0206   00D2           00731         movwf   input_bh
+0207   3E30           00732         addlw   30h
+0208   20CB           00733         call    write_lcd
+0209                  00734 mode_input_bl
+0209   1105           00735         bcf     PORTA, LCD_RS
+020A   30C4           00736         movlw   0c4h            ; DDRAM=44h
+020B   20CB           00737         call    write_lcd
+020C   1505           00738         bsf     PORTA, LCD_RS
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00739         
+020D   2135           00740         call    inputkey
+020E   00BE           00741         movwf   work0
+020F   1BBE           00742         btfsc   work0, 7
+0210   2992           00743         goto    mode_input
+0211   1B3E           00744         btfsc   work0, 6
+0212   294F           00745         goto    mode_result
+0213   1ABE           00746         btfsc   work0, 5
+0214   29F8           00747         goto    mode_input_bh
+0215   1A3E           00748         btfsc   work0, 4
+0216   2A1A           00749         goto    mode_input_ch
+                      00750         
+0217   00D3           00751         movwf   input_bl
+0218   3E30           00752         addlw   30h
+0219   20CB           00753         call    write_lcd
+021A                  00754 mode_input_ch
+021A   1105           00755         bcf     PORTA, LCD_RS
+021B   30C6           00756         movlw   0c6h            ; DDRAM=46h
+021C   20CB           00757         call    write_lcd
+021D   1505           00758         bsf     PORTA, LCD_RS
+                      00759         
+021E   2135           00760         call    inputkey
+021F   00BE           00761         movwf   work0
+0220   1BBE           00762         btfsc   work0, 7
+0221   2992           00763         goto    mode_input
+0222   1B3E           00764         btfsc   work0, 6
+0223   294F           00765         goto    mode_result
+0224   1ABE           00766         btfsc   work0, 5
+0225   2A09           00767         goto    mode_input_bl
+0226   1A3E           00768         btfsc   work0, 4
+0227   2A2B           00769         goto    mode_input_cl
+                      00770         
+0228   00D4           00771         movwf   input_ch
+0229   3E30           00772         addlw   30h
+022A   20CB           00773         call    write_lcd
+022B                  00774 mode_input_cl
+022B   1105           00775         bcf     PORTA, LCD_RS
+022C   30C7           00776         movlw   0c7h            ; DDRAM=47h
+022D   20CB           00777         call    write_lcd
+022E   1505           00778         bsf     PORTA, LCD_RS
+                      00779         
+022F   2135           00780         call    inputkey
+0230   00BE           00781         movwf   work0
+0231   1BBE           00782         btfsc   work0, 7
+0232   2992           00783         goto    mode_input
+0233   1B3E           00784         btfsc   work0, 6
+0234   294F           00785         goto    mode_result
+0235   1ABE           00786         btfsc   work0, 5
+0236   2A1A           00787         goto    mode_input_ch
+0237   1A3E           00788         btfsc   work0, 4
+0238   2A3C           00789         goto    mode_input_dh
+                      00790         
+0239   00D5           00791         movwf   input_cl
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+023A   3E30           00792         addlw   30h
+023B   20CB           00793         call    write_lcd
+023C                  00794 mode_input_dh
+023C   1105           00795         bcf     PORTA, LCD_RS
+023D   30C9           00796         movlw   0c9h            ; DDRAM=49h
+023E   20CB           00797         call    write_lcd
+023F   1505           00798         bsf     PORTA, LCD_RS
+                      00799         
+0240   2135           00800         call    inputkey
+0241   00BE           00801         movwf   work0
+0242   1BBE           00802         btfsc   work0, 7
+0243   2992           00803         goto    mode_input
+0244   1B3E           00804         btfsc   work0, 6
+0245   294F           00805         goto    mode_result
+0246   1ABE           00806         btfsc   work0, 5
+0247   2A2B           00807         goto    mode_input_cl
+0248   1A3E           00808         btfsc   work0, 4
+0249   2A4D           00809         goto    mode_input_dl
+                      00810         
+024A   00D6           00811         movwf   input_dh
+024B   3E30           00812         addlw   30h
+024C   20CB           00813         call    write_lcd
+024D                  00814 mode_input_dl
+024D   1105           00815         bcf     PORTA, LCD_RS
+024E   30CA           00816         movlw   0cah            ; DDRAM=4ah
+024F   20CB           00817         call    write_lcd
+0250   1505           00818         bsf     PORTA, LCD_RS
+                      00819         
+0251   2135           00820         call    inputkey
+0252   00BE           00821         movwf   work0
+0253   1BBE           00822         btfsc   work0, 7
+0254   2992           00823         goto    mode_input
+0255   1B3E           00824         btfsc   work0, 6
+0256   294F           00825         goto    mode_result
+0257   1ABE           00826         btfsc   work0, 5
+0258   2A3C           00827         goto    mode_input_dh
+0259   1A3E           00828         btfsc   work0, 4
+025A   2A5E           00829         goto    mode_input_ok
+                      00830         
+025B   00D7           00831         movwf   input_dl
+025C   3E30           00832         addlw   30h
+025D   20CB           00833         call    write_lcd
+025E                  00834 mode_input_ok
+025E   1105           00835         bcf     PORTA, LCD_RS
+025F   30CE           00836         movlw   0ceh            ; DDRAM=4eh
+0260   20CB           00837         call    write_lcd
+0261   1505           00838         bsf     PORTA, LCD_RS
+                      00839         
+0262   211E           00840         call    waitkey
+0263   00BE           00841         movwf   work0
+0264   1BBE           00842         btfsc   work0, 7
+0265   2A76           00843         goto    mode_input_menu
+0266   3A41           00844         xorlw   41h
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 17
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0267   1903           00845         btfsc   STATUS, Z
+0268   2A7B           00846         goto    mode_input_calc
+0269   3A03           00847         xorlw   3
+026A   1903           00848         btfsc   STATUS, Z
+026B   2A4D           00849         goto    mode_input_dl   ; <
+026C   3A60           00850         xorlw   60h
+026D   1903           00851         btfsc   STATUS, Z
+026E   2A4D           00852         goto    mode_input_dl   ; <
+026F   3A03           00853         xorlw   3
+0270   1903           00854         btfsc   STATUS, Z
+0271   294F           00855         goto    mode_result     ; ^
+0272   3A05           00856         xorlw   5
+0273   1903           00857         btfsc   STATUS, Z
+0274   29D6           00858         goto    mode_input_ah   ; >
+0275   2A5E           00859         goto    mode_input_ok
+0276                  00860 mode_input_menu
+0276   22A0           00861         call    mode_menu
+0277   3800           00862         iorlw   0
+0278   1903           00863         btfsc   STATUS, Z
+0279   2992           00864         goto    mode_input
+027A   2805           00865         goto    typetable
+027B                  00866 mode_input_calc
+027B   0851           00867         movf    input_al, 0
+027C   00C8           00868         movwf   disp_ai
+027D   1003           00869         bcf     STATUS, C
+027E   0D50           00870         rlf     input_ah, 0
+027F   07C8           00871         addwf   disp_ai, 1
+0280   07C8           00872         addwf   disp_ai, 1
+0281   07C8           00873         addwf   disp_ai, 1
+0282   07C8           00874         addwf   disp_ai, 1
+0283   07C8           00875         addwf   disp_ai, 1
+                      00876         
+0284   0853           00877         movf    input_bl, 0
+0285   00C9           00878         movwf   disp_bi
+0286   1003           00879         bcf     STATUS, C
+0287   0D52           00880         rlf     input_bh, 0
+0288   07C9           00881         addwf   disp_bi, 1
+0289   07C9           00882         addwf   disp_bi, 1
+028A   07C9           00883         addwf   disp_bi, 1
+028B   07C9           00884         addwf   disp_bi, 1
+028C   07C9           00885         addwf   disp_bi, 1
+                      00886         
+028D   0855           00887         movf    input_cl, 0
+028E   00CA           00888         movwf   disp_ci
+028F   1003           00889         bcf     STATUS, C
+0290   0D54           00890         rlf     input_ch, 0
+0291   07CA           00891         addwf   disp_ci, 1
+0292   07CA           00892         addwf   disp_ci, 1
+0293   07CA           00893         addwf   disp_ci, 1
+0294   07CA           00894         addwf   disp_ci, 1
+0295   07CA           00895         addwf   disp_ci, 1
+                      00896         
+0296   0857           00897         movf    input_dl, 0
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 18
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0297   00CB           00898         movwf   disp_di
+0298   1003           00899         bcf     STATUS, C
+0299   0D56           00900         rlf     input_dh, 0
+029A   07CB           00901         addwf   disp_di, 1
+029B   07CB           00902         addwf   disp_di, 1
+029C   07CB           00903         addwf   disp_di, 1
+029D   07CB           00904         addwf   disp_di, 1
+029E   07CB           00905         addwf   disp_di, 1
+                      00906         
+029F   3400           00907         retlw   0
+                      00908 
+                      00909 
+02A0                  00910 mode_menu
+02A0   1105           00911         bcf     PORTA, LCD_RS
+02A1   300F           00912         movlw   0fh             ; display-on cursor-on blink-on
+02A2   20CB           00913         call    write_lcd
+02A3   3001           00914         movlw   1               ; clear-all
+02A4   20CB           00915         call    write_lcd
+02A5   2055           00916         call    wait200ms
+                      00917         
+02A6   1505           00918         bsf     PORTA, LCD_RS
+02A7   304D           00919         movlw   4dh
+02A8   20CB           00920         call    write_lcd
+02A9   3065           00921         movlw   65h
+02AA   20CB           00922         call    write_lcd
+02AB   306E           00923         movlw   6eh
+02AC   20CB           00924         call    write_lcd
+02AD   3075           00925         movlw   75h
+02AE   20CB           00926         call    write_lcd
+02AF   3020           00927         movlw   20h
+02B0   20CB           00928         call    write_lcd
+02B1   3063           00929         movlw   63h
+02B2   20CB           00930         call    write_lcd
+02B3   306F           00931         movlw   6fh
+02B4   20CB           00932         call    write_lcd
+02B5   3064           00933         movlw   64h
+02B6   20CB           00934         call    write_lcd
+02B7   3065           00935         movlw   65h
+02B8   20CB           00936         call    write_lcd
+02B9   303A           00937         movlw   3ah
+02BA   20CB           00938         call    write_lcd
+02BB                  00939 mode_menu_loop0
+02BB   211E           00940         call    waitkey
+02BC   00DC           00941         movwf   menu0
+02BD   3A42           00942         xorlw   42h
+02BE   1903           00943         btfsc   STATUS, Z
+02BF   3400           00944         retlw   0
+                      00945         
+02C0   1E5C           00946         btfss   menu0, KEYNUM
+02C1   2ABB           00947         goto    mode_menu_loop0
+                      00948         
+02C2   302A           00949         movlw   2ah
+02C3   20CB           00950         call    write_lcd
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 19
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02C4                  00951 mode_menu_loop1
+02C4   211E           00952         call    waitkey
+02C5   00DD           00953         movwf   menu1
+02C6   3A42           00954         xorlw   42h
+02C7   1903           00955         btfsc   STATUS, Z
+02C8   3400           00956         retlw   0
+                      00957         
+02C9   1E5D           00958         btfss   menu1, KEYNUM
+02CA   2AC4           00959         goto    mode_menu_loop1
+                      00960         
+02CB   302A           00961         movlw   2ah
+02CC   20CB           00962         call    write_lcd
+02CD                  00963 mode_menu_loop2
+02CD   211E           00964         call    waitkey
+02CE   00DE           00965         movwf   menu2
+02CF   3A42           00966         xorlw   42h
+02D0   1903           00967         btfsc   STATUS, Z
+02D1   3400           00968         retlw   0
+                      00969         
+02D2   1E5E           00970         btfss   menu2, KEYNUM
+02D3   2ACD           00971         goto    mode_menu_loop2
+                      00972         
+02D4   302A           00973         movlw   2ah
+02D5   20CB           00974         call    write_lcd
+02D6                  00975 mode_menu_loop3
+02D6   211E           00976         call    waitkey
+02D7   00DF           00977         movwf   menu3
+02D8   3A42           00978         xorlw   42h
+02D9   1903           00979         btfsc   STATUS, Z
+02DA   3400           00980         retlw   0
+                      00981         
+02DB   1E5F           00982         btfss   menu3, KEYNUM
+02DC   2AD6           00983         goto    mode_menu_loop3
+                      00984         
+02DD   302A           00985         movlw   2ah
+02DE   20CB           00986         call    write_lcd
+                      00987         
+02DF                  00988 mode_menu_check1                ; 1147
+02DF   085C           00989         movf    menu0, 0
+02E0   3A11           00990         xorlw   11h
+02E1   1D03           00991         btfss   STATUS, Z
+02E2   2AF0           00992         goto    mode_menu_check2
+02E3   085D           00993         movf    menu1, 0
+02E4   3A11           00994         xorlw   11h
+02E5   1D03           00995         btfss   STATUS, Z
+02E6   2AF0           00996         goto    mode_menu_check2
+02E7   085E           00997         movf    menu2, 0
+02E8   3A14           00998         xorlw   14h
+02E9   1D03           00999         btfss   STATUS, Z
+02EA   2AF0           01000         goto    mode_menu_check2
+02EB   085F           01001         movf    menu3, 0
+02EC   3A17           01002         xorlw   17h
+02ED   1D03           01003         btfss   STATUS, Z
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 20
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02EE   2AF0           01004         goto    mode_menu_check2
+02EF   3401           01005         retlw   1
+02F0                  01006 mode_menu_check2                ; 0647
+02F0   085C           01007         movf    menu0, 0
+02F1   3A10           01008         xorlw   10h
+02F2   1D03           01009         btfss   STATUS, Z
+02F3   2B01           01010         goto    mode_menu_check3
+02F4   085D           01011         movf    menu1, 0
+02F5   3A16           01012         xorlw   16h
+02F6   1D03           01013         btfss   STATUS, Z
+02F7   2B01           01014         goto    mode_menu_check3
+02F8   085E           01015         movf    menu2, 0
+02F9   3A14           01016         xorlw   14h
+02FA   1D03           01017         btfss   STATUS, Z
+02FB   2B01           01018         goto    mode_menu_check3
+02FC   085F           01019         movf    menu3, 0
+02FD   3A17           01020         xorlw   17h
+02FE   1D03           01021         btfss   STATUS, Z
+02FF   2B01           01022         goto    mode_menu_check3
+0300   3402           01023         retlw   2
+0301                  01024 mode_menu_check3                ; 3922
+0301   085C           01025         movf    menu0, 0
+0302   3A13           01026         xorlw   13h
+0303   1D03           01027         btfss   STATUS, Z
+0304   2B12           01028         goto    mode_menu_check4
+0305   085D           01029         movf    menu1, 0
+0306   3A19           01030         xorlw   19h
+0307   1D03           01031         btfss   STATUS, Z
+0308   2B12           01032         goto    mode_menu_check4
+0309   085E           01033         movf    menu2, 0
+030A   3A12           01034         xorlw   12h
+030B   1D03           01035         btfss   STATUS, Z
+030C   2B12           01036         goto    mode_menu_check4
+030D   085F           01037         movf    menu3, 0
+030E   3A12           01038         xorlw   12h
+030F   1D03           01039         btfss   STATUS, Z
+0310   2B12           01040         goto    mode_menu_check4
+0311   3403           01041         retlw   3
+0312                  01042 mode_menu_check4                ; 9423
+0312   085C           01043         movf    menu0, 0
+0313   3A19           01044         xorlw   19h
+0314   1D03           01045         btfss   STATUS, Z
+0315   2B23           01046         goto    mode_menu_check5
+0316   085D           01047         movf    menu1, 0
+0317   3A14           01048         xorlw   14h
+0318   1D03           01049         btfss   STATUS, Z
+0319   2B23           01050         goto    mode_menu_check5
+031A   085E           01051         movf    menu2, 0
+031B   3A12           01052         xorlw   12h
+031C   1D03           01053         btfss   STATUS, Z
+031D   2B23           01054         goto    mode_menu_check5
+031E   085F           01055         movf    menu3, 0
+031F   3A13           01056         xorlw   13h
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 21
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0320   1D03           01057         btfss   STATUS, Z
+0321   2B23           01058         goto    mode_menu_check5
+0322   3404           01059         retlw   4
+0323                  01060 mode_menu_check5                ; 2711
+0323   085C           01061         movf    menu0, 0
+0324   3A12           01062         xorlw   12h
+0325   1D03           01063         btfss   STATUS, Z
+0326   2B34           01064         goto    mode_menu_check6
+0327   085D           01065         movf    menu1, 0
+0328   3A17           01066         xorlw   17h
+0329   1D03           01067         btfss   STATUS, Z
+032A   2B34           01068         goto    mode_menu_check6
+032B   085E           01069         movf    menu2, 0
+032C   3A11           01070         xorlw   11h
+032D   1D03           01071         btfss   STATUS, Z
+032E   2B34           01072         goto    mode_menu_check6
+032F   085F           01073         movf    menu3, 0
+0330   3A11           01074         xorlw   11h
+0331   1D03           01075         btfss   STATUS, Z
+0332   2B34           01076         goto    mode_menu_check6
+0333   3405           01077         retlw   5
+0334                  01078 mode_menu_check6                ; 3235
+0334   085C           01079         movf    menu0, 0
+0335   3A13           01080         xorlw   13h
+0336   1D03           01081         btfss   STATUS, Z
+0337   2B45           01082         goto    mode_menu_check7
+0338   085D           01083         movf    menu1, 0
+0339   3A12           01084         xorlw   12h
+033A   1D03           01085         btfss   STATUS, Z
+033B   2B45           01086         goto    mode_menu_check7
+033C   085E           01087         movf    menu2, 0
+033D   3A13           01088         xorlw   13h
+033E   1D03           01089         btfss   STATUS, Z
+033F   2B45           01090         goto    mode_menu_check7
+0340   085F           01091         movf    menu3, 0
+0341   3A15           01092         xorlw   15h
+0342   1D03           01093         btfss   STATUS, Z
+0343   2B45           01094         goto    mode_menu_check7
+0344   3406           01095         retlw   6
+0345                  01096 mode_menu_check7
+0345   2AA0           01097         goto    mode_menu
+                      01098 
+                      01099 
+0346                  01100 type1
+0346   3032           01101         movlw   32h
+0347   00E0           01102         movwf   type2count
+0348   00E1           01103         movwf   type3count
+0349   00E2           01104         movwf   type4count
+034A   00E3           01105         movwf   type5count
+034B   00E4           01106         movwf   type6count
+                      01107         
+034C   01E8           01108         clrf    type6a
+034D   01E9           01109         clrf    type6b
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 22
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+034E   01EA           01110         clrf    type6c
+034F   01EB           01111         clrf    type6d
+                      01112         
+0350   1105           01113         bcf     PORTA, LCD_RS
+0351   300C           01114         movlw   0ch             ; display-on cursor-off blink-off
+0352   20CB           01115         call    write_lcd
+0353   3001           01116         movlw   1               ; clear-all
+0354   20CB           01117         call    write_lcd
+0355   2055           01118         call    wait200ms
+                      01119         
+0356   1505           01120         bsf     PORTA, LCD_RS
+0357   3050           01121         movlw   50h
+0358   20CB           01122         call    write_lcd
+0359   3072           01123         movlw   72h
+035A   20CB           01124         call    write_lcd
+035B   3065           01125         movlw   65h
+035C   20CB           01126         call    write_lcd
+035D   3073           01127         movlw   73h
+035E   20CB           01128         call    write_lcd
+035F   3073           01129         movlw   73h
+0360   20CB           01130         call    write_lcd
+0361   3020           01131         movlw   20h
+0362   20CB           01132         call    write_lcd
+0363   3045           01133         movlw   45h
+0364   20CB           01134         call    write_lcd
+0365   306E           01135         movlw   6eh
+0366   20CB           01136         call    write_lcd
+0367   3074           01137         movlw   74h
+0368   20CB           01138         call    write_lcd
+0369   3065           01139         movlw   65h
+036A   20CB           01140         call    write_lcd
+036B   3072           01141         movlw   72h
+036C   20CB           01142         call    write_lcd
+036D   3020           01143         movlw   20h
+036E   20CB           01144         call    write_lcd
+036F   306B           01145         movlw   6bh
+0370   20CB           01146         call    write_lcd
+0371   3065           01147         movlw   65h
+0372   20CB           01148         call    write_lcd
+0373   3079           01149         movlw   79h
+0374   20CB           01150         call    write_lcd
+                      01151         
+0375   1105           01152         bcf     PORTA, LCD_RS
+0376   30C0           01153         movlw   0c0h
+0377   20CB           01154         call    write_lcd               ; DDRAM-40h
+0378   1505           01155         bsf     PORTA, LCD_RS
+                      01156         
+0379   3028           01157         movlw   28h
+037A   20CB           01158         call    write_lcd
+037B   304C           01159         movlw   4ch
+037C   20CB           01160         call    write_lcd
+037D   306F           01161         movlw   6fh
+037E   20CB           01162         call    write_lcd
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 23
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+037F   306E           01163         movlw   6eh
+0380   20CB           01164         call    write_lcd
+0381   3067           01165         movlw   67h
+0382   20CB           01166         call    write_lcd
+0383   3029           01167         movlw   29h
+0384   20CB           01168         call    write_lcd
+0385                  01169 type1loop
+0385   211E           01170         call    waitkey
+0386   3A80           01171         xorlw   80h
+0387   1D03           01172         btfss   STATUS, Z
+0388   2B85           01173         goto    type1loop
+                      01174         
+0389   22A0           01175         call    mode_menu
+038A   3800           01176         iorlw   0
+038B   1903           01177         btfsc   STATUS, Z
+038C   2B46           01178         goto    type1
+038D   2805           01179         goto    typetable
+                      01180 
+                      01181 
+038E                  01182 type2
+038E   0860           01183         movf    type2count, 0
+038F   00CC           01184         movwf   disp_c
+0390   2192           01185         call    mode_input
+0391                  01186 type2loop
+0391   01D8           01187         clrf    acch
+0392   01D9           01188         clrf    accl
+0393   0848           01189         movf    disp_ai, 0
+0394   202D           01190         call    acc_add
+0395   0848           01191         movf    disp_ai, 0
+0396   202D           01192         call    acc_add
+0397   0858           01193         movf    acch, 0
+0398   00C0           01194         movwf   disp_ah
+0399   0859           01195         movf    accl, 0
+039A   00C1           01196         movwf   disp_al
+                      01197         
+039B   01D8           01198         clrf    acch
+039C   3008           01199         movlw   8
+039D   00D9           01200         movwf   accl
+039E   084A           01201         movf    disp_ci, 0
+039F   2031           01202         call    acc_sub
+03A0   0858           01203         movf    acch, 0
+03A1   00C2           01204         movwf   disp_bh
+03A2   0859           01205         movf    accl, 0
+03A3   00C3           01206         movwf   disp_bl
+                      01207         
+03A4   01D8           01208         clrf    acch
+03A5   3001           01209         movlw   1
+03A6   00D9           01210         movwf   accl
+03A7   0848           01211         movf    disp_ai, 0
+03A8   202D           01212         call    acc_add
+03A9   0848           01213         movf    disp_ai, 0
+03AA   202D           01214         call    acc_add
+03AB   0848           01215         movf    disp_ai, 0
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 24
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03AC   202D           01216         call    acc_add
+03AD   084A           01217         movf    disp_ci, 0
+03AE   2031           01218         call    acc_sub
+03AF   084A           01219         movf    disp_ci, 0
+03B0   2031           01220         call    acc_sub
+03B1   0858           01221         movf    acch, 0
+03B2   00C4           01222         movwf   disp_ch
+03B3   0859           01223         movf    accl, 0
+03B4   00C5           01224         movwf   disp_cl
+                      01225         
+03B5   01D8           01226         clrf    acch
+03B6   3007           01227         movlw   7
+03B7   00D9           01228         movwf   accl
+03B8   0849           01229         movf    disp_bi, 0
+03B9   202D           01230         call    acc_add
+03BA   0849           01231         movf    disp_bi, 0
+03BB   202D           01232         call    acc_add
+03BC   0849           01233         movf    disp_bi, 0
+03BD   202D           01234         call    acc_add
+03BE   084B           01235         movf    disp_di, 0
+03BF   2031           01236         call    acc_sub
+03C0   084B           01237         movf    disp_di, 0
+03C1   2031           01238         call    acc_sub
+03C2   084B           01239         movf    disp_di, 0
+03C3   2031           01240         call    acc_sub
+03C4   0858           01241         movf    acch, 0
+03C5   00C6           01242         movwf   disp_dh
+03C6   0859           01243         movf    accl, 0
+03C7   00C7           01244         movwf   disp_dl
+                      01245         
+03C8   03E0           01246         decf    type2count, 1
+03C9   0860           01247         movf    type2count, 0
+03CA   00CC           01248         movwf   disp_c
+                      01249         
+03CB   214F           01250         call    mode_result
+03CC   2B91           01251         goto    type2loop
+                      01252 
+                      01253 
+03CD                  01254 type3
+03CD   0861           01255         movf    type3count, 0
+03CE   00CC           01256         movwf   disp_c
+03CF   2192           01257         call    mode_input
+03D0                  01258 type3loop
+03D0   01C0           01259         clrf    disp_ah
+03D1   084B           01260         movf    disp_di, 0
+03D2   00C1           01261         movwf   disp_al
+                      01262         
+03D3   01C2           01263         clrf    disp_bh
+03D4   0849           01264         movf    disp_bi, 0
+03D5   00C3           01265         movwf   disp_bl
+                      01266         
+03D6   01C4           01267         clrf    disp_ch
+03D7   1003           01268         bcf     STATUS, C
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 25
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03D8   0D4A           01269         rlf     disp_ci, 0
+03D9   00C5           01270         movwf   disp_cl
+                      01271         
+03DA   01C6           01272         clrf    disp_dh
+03DB   1003           01273         bcf     STATUS, C
+03DC   0D48           01274         rlf     disp_ai, 0
+03DD   00C7           01275         movwf   disp_dl
+                      01276         
+03DE   03E1           01277         decf    type3count, 1
+03DF   0861           01278         movf    type3count, 0
+03E0   00CC           01279         movwf   disp_c
+                      01280         
+03E1   214F           01281         call    mode_result
+03E2   2BD0           01282         goto    type3loop
+                      01283 
+                      01284 
+03E3                  01285 type4
+03E3   0862           01286         movf    type4count, 0
+03E4   00CC           01287         movwf   disp_c
+03E5   2192           01288         call    mode_input
+03E6                  01289 type4loop
+03E6   01D8           01290         clrf    acch
+03E7   01D9           01291         clrf    accl
+03E8   0848           01292         movf    disp_ai, 0
+03E9   202D           01293         call    acc_add
+03EA   0849           01294         movf    disp_bi, 0
+03EB   202D           01295         call    acc_add
+03EC   084B           01296         movf    disp_di, 0
+03ED   202D           01297         call    acc_add
+03EE   0858           01298         movf    acch, 0
+03EF   00C0           01299         movwf   disp_ah
+03F0   0859           01300         movf    accl, 0
+03F1   00C1           01301         movwf   disp_al
+                      01302         
+03F2   01D8           01303         clrf    acch
+03F3   01D9           01304         clrf    accl
+03F4   0848           01305         movf    disp_ai, 0
+03F5   202D           01306         call    acc_add
+03F6   0849           01307         movf    disp_bi, 0
+03F7   202D           01308         call    acc_add
+03F8   084A           01309         movf    disp_ci, 0
+03F9   202D           01310         call    acc_add
+03FA   0858           01311         movf    acch, 0
+03FB   00C2           01312         movwf   disp_bh
+03FC   0859           01313         movf    accl, 0
+03FD   00C3           01314         movwf   disp_bl
+                      01315         
+03FE   01D8           01316         clrf    acch
+03FF   01D9           01317         clrf    accl
+0400   0848           01318         movf    disp_ai, 0
+0401   202D           01319         call    acc_add
+0402   084A           01320         movf    disp_ci, 0
+0403   202D           01321         call    acc_add
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 26
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0404   084B           01322         movf    disp_di, 0
+0405   202D           01323         call    acc_add
+0406   0858           01324         movf    acch, 0
+0407   00C4           01325         movwf   disp_ch
+0408   0859           01326         movf    accl, 0
+0409   00C5           01327         movwf   disp_cl
+                      01328         
+040A   01D8           01329         clrf    acch
+040B   01D9           01330         clrf    accl
+040C   0849           01331         movf    disp_bi, 0
+040D   202D           01332         call    acc_add
+040E   084A           01333         movf    disp_ci, 0
+040F   202D           01334         call    acc_add
+0410   084B           01335         movf    disp_di, 0
+0411   202D           01336         call    acc_add
+0412   0858           01337         movf    acch, 0
+0413   00C6           01338         movwf   disp_dh
+0414   0859           01339         movf    accl, 0
+0415   00C7           01340         movwf   disp_dl
+                      01341         
+0416   01D8           01342         clrf    acch
+0417   01D9           01343         clrf    accl
+0418   0848           01344         movf    disp_ai, 0
+0419   00BE           01345         movwf   work0
+041A   00BF           01346         movwf   work1
+041B   2035           01347         call    acc_mul
+041C   0849           01348         movf    disp_bi, 0
+041D   00BE           01349         movwf   work0
+041E   00BF           01350         movwf   work1
+041F   2035           01351         call    acc_mul
+0420   084A           01352         movf    disp_ci, 0
+0421   00BE           01353         movwf   work0
+0422   00BF           01354         movwf   work1
+0423   2035           01355         call    acc_mul
+0424   084B           01356         movf    disp_di, 0
+0425   00BE           01357         movwf   work0
+0426   00BF           01358         movwf   work1
+0427   2035           01359         call    acc_mul
+                      01360         
+0428   0858           01361         movf    acch, 0
+0429   39FC           01362         andlw   0fch
+042A   1903           01363         btfsc   STATUS, Z
+042B   2C38           01364         goto    type4skip
+                      01365         
+042C   0AC1           01366         incf    disp_al, 1
+042D   1903           01367         btfsc   STATUS, Z
+042E   0AC0           01368         incf    disp_ah, 1
+042F   0AC3           01369         incf    disp_bl, 1
+0430   1903           01370         btfsc   STATUS, Z
+0431   0AC2           01371         incf    disp_bh, 1
+0432   0AC5           01372         incf    disp_cl, 1
+0433   1903           01373         btfsc   STATUS, Z
+0434   0AC4           01374         incf    disp_ch, 1
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 27
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0435   0AC7           01375         incf    disp_dl, 1
+0436   1903           01376         btfsc   STATUS, Z
+0437   0AC6           01377         incf    disp_dh, 1
+0438                  01378 type4skip
+0438   03E2           01379         decf    type4count, 1
+0439   0862           01380         movf    type4count, 0
+043A   00CC           01381         movwf   disp_c
+                      01382         
+043B   214F           01383         call    mode_result
+043C   2BE6           01384         goto    type4loop
+                      01385 
+                      01386 
+043D                  01387 type5
+043D   0863           01388         movf    type5count, 0
+043E   00CC           01389         movwf   disp_c
+043F   2192           01390         call    mode_input
+0440                  01391 type5loop
+0440   01C0           01392         clrf    disp_ah
+0441   01C2           01393         clrf    disp_bh
+0442   01C4           01394         clrf    disp_ch
+0443   01C6           01395         clrf    disp_dh
+                      01396         
+0444   0848           01397         movf    disp_ai, 0
+0445   2021           01398         call    type5sub
+0446   00C1           01399         movwf   disp_al
+                      01400         
+0447   0849           01401         movf    disp_bi, 0
+0448   2021           01402         call    type5sub
+0449   00C3           01403         movwf   disp_bl
+                      01404         
+044A   084A           01405         movf    disp_ci, 0
+044B   2021           01406         call    type5sub
+044C   00C5           01407         movwf   disp_cl
+                      01408         
+044D   084B           01409         movf    disp_di, 0
+044E   2021           01410         call    type5sub
+044F   00C7           01411         movwf   disp_dl
+                      01412         
+0450   03E3           01413         decf    type5count, 1
+0451   0863           01414         movf    type5count, 0
+0452   00CC           01415         movwf   disp_c
+                      01416         
+0453   214F           01417         call    mode_result
+0454   2C40           01418         goto    type5loop
+                      01419 
+                      01420 
+0455                  01421 type6
+0455   0864           01422         movf    type6count, 0
+0456   00CC           01423         movwf   disp_c
+0457   2192           01424         call    mode_input
+0458                  01425 type6loop
+0458   01C0           01426         clrf    disp_ah
+0459   0868           01427         movf    type6a, 0
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 28
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+045A   0749           01428         addwf   disp_bi, 0
+045B   00C1           01429         movwf   disp_al
+                      01430         
+045C   01C2           01431         clrf    disp_bh
+045D   0869           01432         movf    type6b, 0
+045E   074A           01433         addwf   disp_ci, 0
+045F   00C3           01434         movwf   disp_bl
+                      01435         
+0460   01C4           01436         clrf    disp_ch
+0461   086A           01437         movf    type6c, 0
+0462   074B           01438         addwf   disp_di, 0
+0463   00C5           01439         movwf   disp_cl
+                      01440         
+0464   01C6           01441         clrf    disp_dh
+0465   086B           01442         movf    type6d, 0
+0466   0748           01443         addwf   disp_ai, 0
+0467   00C7           01444         movwf   disp_dl
+                      01445         
+0468   0848           01446         movf    disp_ai, 0
+0469   00E8           01447         movwf   type6a
+046A   0849           01448         movf    disp_bi, 0
+046B   00E9           01449         movwf   type6b
+046C   084A           01450         movf    disp_ci, 0
+046D   00EA           01451         movwf   type6c
+046E   084B           01452         movf    disp_di, 0
+046F   00EB           01453         movwf   type6d
+                      01454         
+0470   03E4           01455         decf    type6count, 1
+0471   0864           01456         movf    type6count, 0
+0472   00CC           01457         movwf   disp_c
+                      01458         
+0473   214F           01459         call    mode_result
+0474   2C58           01460         goto    type6loop
+                      01461 
+                      01462 
+0475                  01463 init
+0475   30C0           01464         movlw   0c0h                    ; PORTA: 11000000
+0476   0085           01465         movwf   PORTA
+0477   0186           01466         clrf    PORTB                   ; PORTB: 00000000
+                      01467         
+0478   1683           01468         bsf     STATUS, RP0
+                      01469         
+0479   3020           01470         movlw   20h                     ; PORTA: OOIOOOOO
+047A   0085           01471         movwf   PORTA
+047B   30B0           01472         movlw   0b0h                    ; PORTB: IOIIOOOO
+047C   0086           01473         movwf   PORTB
+047D   3007           01474         movlw   7                       ; RBPU, TMR0:1/256
+047E   0081           01475         movwf   OPTION_REG & 7fh
+                      01476         
+047F   1283           01477         bcf     STATUS, RP0
+                      01478         
+0480   3007           01479         movlw   7                       ; PORTA: digital-input
+0481   009F           01480         movwf   CMCON
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 29
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      01481         
+0482   2055           01482         call    wait200ms
+0483   2055           01483         call    wait200ms
+                      01484         
+0484   3033           01485         movlw   33h
+0485   20CF           01486         call    write_lcd8
+0486   2055           01487         call    wait200ms
+                      01488         
+0487   3033           01489         movlw   33h
+0488   20CF           01490         call    write_lcd8
+0489   2055           01491         call    wait200ms
+                      01492         
+048A   3033           01493         movlw   33h
+048B   20CF           01494         call    write_lcd8
+048C   2055           01495         call    wait200ms
+                      01496                                 ; 8bit mode
+048D   3022           01497         movlw   22h
+048E   20CF           01498         call    write_lcd8
+                      01499                                 ; 4bit mode
+                      01500         
+048F   3028           01501         movlw   28h             ; 4bit 2lines 5x8font
+0490   20CB           01502         call    write_lcd
+0491   300C           01503         movlw   0ch             ; display-on cursor-off blink-off
+0492   20CB           01504         call    write_lcd
+0493   3006           01505         movlw   6               ; increment no-shift
+0494   20CB           01506         call    write_lcd
+0495   3001           01507         movlw   1               ; clear-all
+0496   20CB           01508         call    write_lcd
+0497   2055           01509         call    wait200ms
+0498                  01510 passwordcheck
+0498   22A0           01511         call    mode_menu
+0499   3A01           01512         xorlw   1
+049A   1D03           01513         btfss   STATUS, Z
+049B   2C98           01514         goto    passwordcheck
+049C   2B46           01515         goto    type1
+                      01516 
+                      01517 
+                      01518         end
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 30
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADEN                              00000003
+BRGH                              00000002
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CIS                               00000003
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000001F
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+EEADR                             0000009B
+EECON1                            0000009C
+EECON2                            0000009D
+EEDATA                            0000009A
+EEIE                              00000007
+EEIF                              00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+KEYA                              00000002
+KEYCAN                            00000001
+KEYCMD                            00000006
+KEYCUR                            00000005
+KEYD                              00000003
+KEYENT                            00000000
+KEYL                              00000001
+KEYNULL                           00000007
+KEYNUM                            00000004
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 31
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+KEYR                              00000002
+KEYS                              00000003
+KEYU                              00000000
+LCD_E                             00000003
+LCD_RS                            00000002
+NOT_BO                            00000000
+NOT_BOD                           00000000
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+OERR                              00000001
+OPTION_REG                        00000081
+OSCF                              00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIR1                              0000000C
+PORTA                             00000005
+PORTB                             00000006
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+RBIE                              00000003
+RBIF                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+RX9                               00000006
+RX9D                              00000000
+SCAN0                             00000000
+SCAN1                             00000001
+SCAN2                             00000004
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 32
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+T1CKPS1                           00000005
+T1CON                             00000010
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRMT                              00000001
+TX9                               00000006
+TX9D                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+VR0                               00000000
+VR1                               00000001
+VR2                               00000002
+VR3                               00000003
+VRCON                             0000009F
+VREN                              00000007
+VROE                              00000006
+VRR                               00000005
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_BOREN_OFF                        00003FBF
+_BOREN_ON                         00003FFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_DATA_CP_OFF                      00003FFF
+_DATA_CP_ON                       00003EFF
+_ER_OSC_CLKOUT                    00003FFF
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 33
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_ER_OSC_NOCLKOUT                  00003FFE
+_EXTCLK_OSC                       00003FEF
+_HS_OSC                           00003FEE
+_INTOSC_OSC_CLKOUT                00003FFD
+_INTOSC_OSC_NOCLKOUT              00003FFC
+_INTRC_OSC_CLKOUT                 00003FFD
+_INTRC_OSC_NOCLKOUT               00003FFC
+_LP_OSC                           00003FEC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_MCLRE_OFF                        00003FDF
+_MCLRE_ON                         00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC_CLKOUT                    00003FFF
+_RC_OSC_NOCLKOUT                  00003FFE
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FED
+__16F648A                         00000001
+acc_add                           0000002D
+acc_mul                           00000035
+acc_mul_loop                      00000038
+acc_sub                           00000031
+acch                              00000058
+accl                              00000059
+acctmph                           0000005A
+acctmpl                           0000005B
+disp_ah                           00000040
+disp_ai                           00000048
+disp_al                           00000041
+disp_bh                           00000042
+disp_bi                           00000049
+disp_bl                           00000043
+disp_c                            0000004C
+disp_ch                           00000044
+disp_ci                           0000004A
+disp_cl                           00000045
+disp_dh                           00000046
+disp_di                           0000004B
+disp_dl                           00000047
+init                              00000475
+input_ah                          00000050
+input_al                          00000051
+input_bh                          00000052
+input_bl                          00000053
+input_ch                          00000054
+input_cl                          00000055
+input_dh                          00000056
+input_dl                          00000057
+inputkey                          00000135
+inputkeymenu                      0000014A
+keyscan                           000000DE
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 34
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+menu0                             0000005C
+menu1                             0000005D
+menu2                             0000005E
+menu3                             0000005F
+mode_input                        00000192
+mode_input_ah                     000001D6
+mode_input_al                     000001E7
+mode_input_bh                     000001F8
+mode_input_bl                     00000209
+mode_input_calc                   0000027B
+mode_input_ch                     0000021A
+mode_input_cl                     0000022B
+mode_input_dh                     0000023C
+mode_input_dl                     0000024D
+mode_input_menu                   00000276
+mode_input_ok                     0000025E
+mode_menu                         000002A0
+mode_menu_check1                  000002DF
+mode_menu_check2                  000002F0
+mode_menu_check3                  00000301
+mode_menu_check4                  00000312
+mode_menu_check5                  00000323
+mode_menu_check6                  00000334
+mode_menu_check7                  00000345
+mode_menu_loop0                   000002BB
+mode_menu_loop1                   000002C4
+mode_menu_loop2                   000002CD
+mode_menu_loop3                   000002D6
+mode_result                       0000014F
+mode_result_loop                  00000186
+passwordcheck                     00000498
+type1                             00000346
+type1loop                         00000385
+type2                             0000038E
+type2count                        00000060
+type2loop                         00000391
+type3                             000003CD
+type3count                        00000061
+type3loop                         000003D0
+type4                             000003E3
+type4count                        00000062
+type4loop                         000003E6
+type4skip                         00000438
+type5                             0000043D
+type5count                        00000063
+type5loop                         00000440
+type5sub                          00000021
+type6                             00000455
+type6a                            00000068
+type6b                            00000069
+type6c                            0000006A
+type6count                        00000064
+type6d                            0000006B
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 35
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+type6loop                         00000458
+typetable                         00000005
+wait1ms                           00000049
+wait1ms_0                         0000004A
+wait200ms                         00000055
+wait200ms_0                       00000057
+wait50ms                          0000004F
+wait50ms_0                        00000051
+waitkey                           0000011E
+waitkeyenter                      0000012A
+waitkeyloop                       00000122
+waitkeyreleaseloop                0000011B
+waitkeyreturn                     00000133
+work0                             0000003E
+work1                             0000003F
+work2                             0000004F
+write_acc                         000000AA
+write_acc_loop1                   000000B6
+write_acc_loop2                   000000C1
+write_acc_sign                    000000B3
+write_dec                         0000009E
+write_dec_loop                    0000009F
+write_hex                         0000007D
+write_hex_ha                      00000082
+write_hex_hn                      00000089
+write_hex_l                       0000008E
+write_hex_la                      00000093
+write_hex_ln                      00000099
+write_lcd                         000000CB
+write_lcd8                        000000CF
+write_lcd8_wait                   000000D9
+write_vpattern                    0000005B
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X----XXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+00C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0100 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0140 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0180 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+01C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0200 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0240 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+MPASM  5.02                      BLACKBOX.ASM   8-30-2007  4:43:22         PAGE 36
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+
+0280 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+02C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0300 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0340 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0380 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+03C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0400 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0440 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0480 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXX--- ---------------- ----------------
+2000 : -------X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:  1177
+Program Memory Words Free:  2919
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     0 reported,     0 suppressed
+
+

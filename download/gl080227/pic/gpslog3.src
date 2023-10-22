@@ -1,0 +1,1465 @@
+
+	device pic12c509,irc_osc,wdt_off,protect_off,mclr_off
+	reset	init
+
+;
+;	log(hex-dump format) to GPS*.LOG
+;	RS : 9600N81
+;
+
+MMCDO	=	gpio.0
+MMCDI	=	gpio.1
+MMCCS	=	gpio.2
+RX	=	gpio.3
+TX	=	gpio.4
+MMCCK	=	gpio.5
+
+CARRY	=	status.0
+ZERO	=	status.2
+;RTCC	=	tmr0
+;PC	=	pcl
+
+	org	7		; bank=0
+
+mode	ds	1
+
+MODE_DIR	=	mode.0
+MODE_DETECT2LOG	=	mode.1
+
+work0	ds	1
+work1	ds	1
+
+mmc_packet	ds	6	; addr must be in 0 - 0fh
+bitcount	ds	1
+bytecount	ds	1
+addr	ds	4		; work address register
+c_hsecp	ds	1		; log2 of half-sector(256 bytes)s per cluster
+f_sec	ds	1		; sectors of FAT
+
+remain_sec	ds	1	; remain sectors in cluster
+cur_cluster	ds	2	; current cluster
+rem_byte	ds	2	; remain bytes in sector(512 bytes)
+
+
+	org	30h		; bank=1
+
+fataddr	ds	4
+useraddr	ds	4
+rdeaddr	ds	4
+
+	org	0
+
+init
+;	movlw	7fh
+	andlw	0ffh
+	andlw	0ffh
+	andlw	0ffh
+	andlw	0ffh
+	andlw	0ffh
+	andlw	0ffh
+	andlw	0ffh
+	movwf	osccal
+	
+	goto	init2
+
+
+wait1ms
+	clrf	work0
+:loop
+	nop
+	decfsz	work0, 1
+	goto	:loop
+	retlw	0
+
+
+wait250ms
+	clrf	work1
+:loop
+	call	wait1ms
+	decfsz	work1, 1
+	goto	:loop
+	retlw	0
+
+
+wait_rx
+	movlw	50h		; 100ms
+	movwf	work0
+	clrf	work1		; 5us x 256 = 1280us
+:loop
+	btfss	RX
+	retlw	0		; RX detect
+	
+	decfsz	work1, 1
+	goto	:loop
+	decfsz	work0, 1
+	goto	:loop
+	retlw	1		; time out
+
+
+wait_rxn
+	movlw	50h		; 100ms
+	movwf	work0
+	clrf	work1		; 1280us
+:loop
+	btfss	RX
+	goto	wait_rxn	; RX detect -> reset
+	
+	decfsz	work1, 1
+	goto	:loop
+	decfsz	work0, 1
+	goto	:loop
+	retlw	1		; time out
+
+
+rsrecv_start
+	movlw	52+3+10		; 1/2 clock (10 : call delay)
+	movwf	RTCC
+rswait
+	movlw	104-3		; 9600bps = 104us / bit
+	subwf	RTCC, 1		; RTCC -= (104-3)
+:loop
+	btfsc	RTCC, 7
+	goto	:loop
+	retlw	0
+
+
+rsrecv_body
+;	clrf	work0
+	movlw	8
+	movwf	bitcount
+:loop
+	call	rswait
+	
+	bsf	CARRY
+	btfss	RX
+	bcf	CARRY
+	rrf	work0, 1
+	
+	decfsz	bitcount, 1
+	goto	:loop
+	
+	retlw	0
+
+
+rssend
+	movwf	work0		; entry: W = txdata
+				; STOP
+	call	rswait
+	call	rswait
+	bcf	TX		; START
+	call	rswait
+	
+	movlw	8
+	movwf	work1
+:loop
+	bsf	TX
+	btfss	work0, 0
+	bcf	TX
+	rrf	work0, 1
+	call	rswait
+	
+	decfsz	work1, 1
+	goto	:loop
+	bsf	TX		; STOP
+	retlw	0
+
+
+clraddr
+	clrf	addr
+	clrf	addr + 1
+	clrf	addr + 2
+	clrf	addr + 3
+	retlw	0
+
+getaddr				; [FSR] <- mmc_packet
+	movwf	FSR
+	
+	movf	mmc_packet + 1, 0
+	movwf	INDF
+	incf	FSR, 1
+	
+	movf	mmc_packet + 2, 0
+	movwf	INDF
+	incf	FSR, 1
+	
+	movf	mmc_packet + 3, 0
+	movwf	INDF
+	incf	FSR, 1
+	
+	movf	mmc_packet + 4, 0
+	movwf	INDF
+	
+	retlw	0
+
+setaddr				; mmc_packet <- [FSR]
+	movwf	FSR
+	
+	movf	INDF, 0
+	movwf	mmc_packet + 1
+	incf	FSR, 1
+	
+	movf	INDF, 0
+	movwf	mmc_packet + 2
+	incf	FSR, 1
+	
+	movf	INDF, 0
+	movwf	mmc_packet + 3
+	incf	FSR, 1
+	
+	movf	INDF, 0
+	movwf	mmc_packet + 4
+	
+	retlw	0
+
+addaddr				; mmc_packet += [FSR]
+	movwf	FSR
+	
+	movlw	3
+	addwf	FSR, 1
+	
+	movf	INDF, 0
+	addwf	mmc_packet + 4, 1
+	movlw	1
+	btfsc	CARRY
+	addwf	mmc_packet + 3, 1
+	btfsc	CARRY
+	addwf	mmc_packet + 2, 1
+	btfsc	CARRY
+	addwf	mmc_packet + 1, 1
+	
+	decf	FSR, 1
+	
+	movf	INDF, 0
+	addwf	mmc_packet + 3, 1
+	movlw	1
+	btfsc	CARRY
+	addwf	mmc_packet + 2, 1
+	btfsc	CARRY
+	addwf	mmc_packet + 1, 1
+	
+	decf	FSR, 1
+	
+	movf	INDF, 0
+	addwf	mmc_packet + 2, 1
+	btfsc	CARRY
+	incf	mmc_packet + 1, 1
+	
+	decf	FSR, 1
+	
+	movf	INDF, 0
+	addwf	mmc_packet + 1, 1
+	
+	retlw	0
+
+
+cluster2addr			; cluster to addr
+	call	clraddr
+	movf	cur_cluster, 0
+	movwf	addr + 1
+	movlw	0feh		; -2 : offset
+	addwf	cur_cluster + 1, 0
+	movwf	addr + 2
+	btfss	CARRY
+	decf	addr + 1, 1
+	
+	movlw	1
+	movwf	remain_sec
+	
+	movf	c_hsecp, 0
+	movwf	work0
+:loop
+	bcf	CARRY
+	rlf	addr + 2, 1	; addr = cur_cluster << (c_hsecp + 8)
+	rlf	addr + 1, 1
+	rlf	addr + 0, 1
+	bcf	CARRY
+	rlf	remain_sec, 1	; remain_sec = 1 << c_hsecp
+	decfsz	work0, 1
+	goto	:loop
+	
+	bcf	CARRY
+	rrf	remain_sec, 1	; remain_sec = 1 << (c_hsecp - 1)
+	movf	remain_sec, 1
+	btfsc	ZERO
+	bsf	remain_sec, 7	; remain_sec = 80h
+	
+	movlw	useraddr
+	call	setaddr
+;	clrf	FSR		; select bank-0
+	
+	movlw	addr
+	goto	addaddr
+
+
+mmcstart
+	bcf	MMCCS
+	retlw	0
+
+
+mmcstop
+	bsf	MMCDI
+	movlw	8
+	movwf	bitcount
+:loop
+	bcf	MMCCK
+	bsf	MMCCK
+	decfsz	bitcount, 1
+	goto	:loop
+	
+	bsf	MMCCS
+	
+	movlw	8
+	movwf	bitcount
+:loop2
+	bcf	MMCCK
+	bsf	MMCCK
+	decfsz	bitcount, 1
+	goto	:loop2
+	retlw	0
+
+
+mmccmd
+	movlw	6
+	movwf	bytecount
+	movlw	mmc_packet
+	movwf	FSR
+:loop
+	movf	INDF, 0
+	call	mmcwrite
+	
+	incf	FSR, 1
+	decfsz	bytecount, 1
+	goto	:loop
+:loop2
+	call	mmcread
+	btfsc	mmc_packet, 7
+	goto	:loop2
+	retlw	0		; card ready
+
+
+waitread			; wait for data-packet start byte
+:loop
+	call	mmcread
+	
+	movf	mmc_packet, 0
+	xorlw	0ffh
+	btfsc	ZERO
+	goto	:loop		; card busy
+	
+	movf	mmc_packet, 0
+	xorlw	0feh		; data-start
+	btfss	ZERO
+	goto	:loop
+	retlw	0
+
+
+waitwrite
+:loop
+	call	mmcread
+	movf	mmc_packet, 0
+	andlw	1fh
+	xorlw	5
+	btfss	ZERO		; data-packet receive complete
+	goto	:loop
+:loop2
+	call	mmcread
+	movf	mmc_packet, 0
+	btfsc	ZERO
+	goto	:loop2		; card busy
+	
+	retlw	0
+
+
+mmcread
+	movlw	8
+	movwf	bitcount
+:loop
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bcf	CARRY
+	btfsc	MMCDO
+	bsf	CARRY
+	
+	rlf	mmc_packet, 1
+	
+	decfsz	bitcount, 1
+	goto	:loop
+	
+	retlw	0
+
+
+mmcwrite_hex			; write '0'-'f' for lower 4 bits
+	andlw	0fh
+	movwf	work1
+	movlw	0f6h
+	addwf	work1, 1	; 0xf6 + 9 = 0xff
+	movlw	27h
+	btfsc	CARRY
+	addwf	work1, 1	; 0x27 + 0x3a + 0 = 0x61 ('a')
+	movlw	3ah
+	addwf	work1, 0	; 0x3a + 0xff = 0x39 ('9')
+mmcwrite		; this addr must be in 0-0ffh (constraints of 'call')
+	movwf	mmc_packet
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 7
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 6
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 5
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 4
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 3
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 2
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 1
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	btfss	mmc_packet, 0
+	bcf	MMCDI
+	bcf	MMCCK
+	bsf	MMCCK
+	
+	bsf	MMCDI
+	retlw	0
+
+
+init2
+	movlw	36h		;GPIO:--11-11-
+	movwf	gpio
+	movlw	9		;GPIO:--OOIOOI
+	tris	gpio
+	movlw	8fh		;GPPU tmr0=1MHz
+	option
+	
+	clrf	tmr0
+	
+	clrf	mode
+	clrf	mmc_packet
+	clrf	mmc_packet + 1
+	clrf	mmc_packet + 2
+	clrf	mmc_packet + 3
+	clrf	mmc_packet + 4
+	clrf	mmc_packet + 5
+main
+	call	wait250ms
+	
+reset0
+	movlw	80		; reset : 80clk
+	movwf	work0
+:loop
+	bcf	MMCCK
+	bsf	MMCCK
+	decfsz	work0, 1
+	goto	:loop
+	
+	call	mmcstart
+	movlw	40h		; cmd0
+	movwf	mmc_packet
+	movlw	95h		; crc
+	movwf	mmc_packet + 5
+	call	mmccmd
+	movlw	0ffh
+	movwf	mmc_packet + 5
+	call	mmcstop
+	
+	movf	mmc_packet, 0
+	xorlw	1
+	movlw	11h		; cmd0 failed
+	btfss	ZERO
+	goto	halt
+reset1
+	call	wait250ms
+	
+	call	mmcstart
+	movlw	41h		; cmd1
+	movwf	mmc_packet
+	call	mmccmd
+	call	mmcstop
+	
+	movf	mmc_packet, 0
+	xorlw	1		; 1: card busy
+	btfsc	ZERO
+	goto	reset1
+	
+	movf	mmc_packet, 0
+	movlw	12h		; cmd1 failed
+	btfss	ZERO
+	goto	halt
+	
+	call	mmcstart
+	movlw	50h		; set_blocklen
+	movwf	mmc_packet
+	clrf	mmc_packet + 1
+	clrf	mmc_packet + 2
+	movlw	2
+	movwf	mmc_packet + 3	; 200h = 512bytes / sector
+	clrf	mmc_packet + 4
+	call	mmccmd
+	clrf	mmc_packet + 3
+	call	mmcstop
+	
+	movf	mmc_packet, 0
+	movlw	13h		; set_blocklen failed
+	btfss	ZERO
+	goto	halt
+	
+getmbr
+	call	mmcstart
+	movlw	51h		; read single block
+	movwf	mmc_packet
+	clrf	mmc_packet + 1	; MBR
+	clrf	mmc_packet + 2
+	clrf	mmc_packet + 3
+	clrf	mmc_packet + 4
+	call	mmccmd
+	
+	movf	mmc_packet, 0
+	movlw	31h		; MBR read failed
+	btfss	ZERO
+	goto	halt
+	
+	call	waitread
+	
+	movlw	0e3h		; skip 1c6h bytes
+	movwf	work0
+:loop1
+	call	mmcread
+	call	mmcread
+	decfsz	work0, 1
+	goto	:loop1
+	
+	call	mmcread		; off = 1c6h: sector number of first partition
+	movf	mmc_packet, 0
+	movwf	mmc_packet + 3
+	call	mmcread		; off = 1c7h
+	movf	mmc_packet, 0
+	movwf	mmc_packet + 2
+	call	mmcread		; off = 1c8h
+	movf	mmc_packet, 0
+	movwf	mmc_packet + 1
+	call	mmcread		; off = 1c9h
+	
+	bcf	CARRY
+	rlf	mmc_packet + 3, 1	; addr = sector_number << 9
+	rlf	mmc_packet + 2, 1
+	rlf	mmc_packet + 1, 1
+	
+	movlw	34h		; skip 34h bytes
+	movwf	work0
+:loop2
+	call	mmcread
+	decfsz	work0, 1
+	goto	:loop2
+	
+	call	mmcread		; off = 1feh
+	movf	mmc_packet, 0
+	xorlw	55h
+	movlw	32h		; MBR signature error
+	btfss	ZERO
+	goto	halt
+	
+	call	mmcread		; off = 1ffh
+	movf	mmc_packet, 0
+	xorlw	0aah
+	movlw	32h		; MBR signature error
+	btfss	ZERO
+	goto	halt
+	
+	call	mmcread		;CRC
+	call	mmcread
+	call	mmcstop
+	
+getpbr
+	call	mmcstart
+	movlw	51h		; read single block
+	movwf	mmc_packet
+	call	mmccmd
+	
+	movf	mmc_packet, 0
+	movlw	41h		; PBR read failed
+	btfss	ZERO
+	goto	halt
+	
+	call	waitread
+	
+	movlw	0dh		; skip 0dh bytes
+	movwf	work0
+:loop1
+	call	mmcread
+	decfsz	work0, 1
+	goto	:loop1
+	
+	call	mmcread		; off = 0dh: half-sector(256 bytes)s / cluster
+	clrf	c_hsecp
+	
+:powcnt
+	incf	c_hsecp, 1
+	bcf	CARRY
+	rrf	mmc_packet, 1
+	movf	mmc_packet, 1
+	btfss	ZERO
+	goto	:powcnt
+	
+	movlw	8		; skip 8 bytes
+	movwf	work0
+:loop2
+	call	mmcread
+	decfsz	work0, 1
+	goto	:loop2
+	
+	call	mmcread		; off = 16h
+	movf	mmc_packet, 0
+	movwf	f_sec
+	
+	movlw	1fh		; skip 1fh bytes
+	movwf	work0
+:loop3
+	call	mmcread
+	decfsz	work0, 1
+	goto	:loop3
+	
+	call	mmcread		; off = 36h
+	movf	mmc_packet, 0
+	xorlw	46h		; 'F'
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 37h
+	movf	mmc_packet, 0
+	xorlw	41h		; 'A'
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 38h
+	movf	mmc_packet, 0
+	xorlw	54h		; 'T'
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 39h
+	movf	mmc_packet, 0
+	xorlw	31h		; '1'
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 3ah
+	movf	mmc_packet, 0
+	xorlw	36h		; '6'
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 3bh
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 3ch
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	halt42
+	
+	call	mmcread		; off = 3dh
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	halt42
+	
+	bsf	PA0
+	goto	getpbr_h
+
+halt42
+	movlw	42h
+halt			; this addr must be in 0-1ffh (constraints of 'goto')
+	movwf	mmc_packet
+	call	mmcstop
+:loop0
+	call	wait250ms
+	call	wait250ms
+	call	wait250ms
+	call	wait250ms
+	call	wait250ms
+	call	wait250ms
+	
+	clrf	bytecount
+:loop1
+	bcf	MMCCS
+	call	wait250ms
+	bsf	MMCCS
+	call	wait250ms
+	
+	movlw	10h
+	addwf	bytecount, 1
+	
+	movf	bytecount, 0
+	xorwf	mmc_packet, 0
+	andlw	0f0h
+	
+	btfss	ZERO
+	goto	:loop1
+	
+	call	wait250ms
+	call	wait250ms
+:loop2
+	movf	bytecount, 0
+	xorwf	mmc_packet, 0
+	andlw	0fh
+	
+	btfsc	ZERO
+	goto	:loop0
+	
+	bcf	MMCCS
+	call	wait250ms
+	bsf	MMCCS
+	call	wait250ms
+	
+	incf	bytecount, 1
+	goto	:loop2
+
+
+	org	200h
+getpbr_h
+	movlw	0e0h		; skip 1c0h bytes
+	movwf	work0
+:loop3
+	bcf	PA0
+	call	mmcread
+	call	mmcread
+	
+	bsf	PA0
+	decfsz	work0, 1
+	goto	:loop3
+	
+	bcf	PA0
+	
+	call	mmcread		; off = 1feh
+	movf	mmc_packet, 0
+	xorlw	55h
+	movlw	43h		; PBR signature error
+	btfss	ZERO
+	goto	halt
+	
+	call	mmcread		; off = 1ffh
+	movf	mmc_packet, 0
+	xorlw	0aah
+	movlw	43h		; PBR signature error
+	btfss	ZERO
+	goto	halt
+	
+	call	mmcread		;CRC
+	call	mmcread
+	call	mmcstop
+	
+	call	clraddr
+	movlw	2		; size of PBR
+	movwf	addr + 2
+	
+	movlw	addr
+	call	addaddr
+	
+	movlw	fataddr		; fataddr = PBR + size of PBR
+	call	getaddr
+	clrf	FSR		; select bank-0
+	
+	call	clraddr
+	movf	f_sec, 0
+	movwf	addr + 2
+	
+	bcf	CARRY
+	rlf	addr + 2, 1	; RDE = fataddr + 0x200 * 2 * f_sec
+				; 2 FATs exist on disk
+	rlf	addr + 1, 1
+	bcf	CARRY
+	rlf	addr + 2, 1
+	rlf	addr + 1, 1
+	
+	movlw	addr
+	call	addaddr
+	
+	movlw	rdeaddr
+	call	getaddr
+	clrf	FSR		; select bank-0
+	
+	call	clraddr
+	movlw	40h		; size of RDE
+	movwf	addr + 2
+	
+	movlw	addr
+	call	addaddr
+	
+	movlw	useraddr	; useraddr = RDE + size of RDE
+	call	getaddr
+;	clrf	FSR		; select bank-0
+	
+	movlw	rdeaddr
+	call	setaddr
+	clrf	FSR		; select bank-0
+	
+;	bsf	PA0
+getrde
+	bcf	PA0
+	
+	bcf	MODE_DIR
+	
+	call	mmcstart
+	movlw	51h		; read single block
+	movwf	mmc_packet
+	call	mmccmd
+	
+	movf	mmc_packet, 0
+	movlw	51h		; RDE read failed
+	btfss	ZERO
+	goto	halt
+	
+	call	waitread
+	
+	clrf	cur_cluster	; cur_cluster = 0: not found
+	clrf	cur_cluster + 1
+	
+	movlw	10h		; 10h entries / sector
+	movwf	work0
+	
+:loop1
+	movlw	20h		; 20h bytes / sector
+	movwf	work1
+	
+	bsf	PA0
+	
+	movf	cur_cluster, 0
+	iorwf	cur_cluster + 1, 0
+	btfss	ZERO
+	goto	:next		; cur_cluster already set
+	
+	bcf	PA0
+	call	mmcread		; off = 0
+	decf	work1, 1
+	
+	movf	mmc_packet, 1
+	movlw	52h		; end of RDE
+	btfsc	ZERO
+	goto	halt		; first byte = 0
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	47h		; 'G'
+	btfss	ZERO
+	goto	:checkdir
+	
+	bcf	PA0
+	call	mmcread		; off = 1
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	50h		; 'P'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 2
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	53h		; 'S'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 3
+	btfsc	mmc_packet, 2	; 'D'
+	bsf	MODE_DETECT2LOG
+	
+	call	mmcread		; off = 4
+	call	mmcread
+	call	mmcread
+	call	mmcread
+	
+	movlw	5
+	subwf	work1, 1
+	
+;	bcf	PA0
+	call	mmcread		; off = 8
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	4ch		; 'L'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 9
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	4fh		; 'O'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 0ah
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	47h		; 'G'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 0bh
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	andlw	1fh		; DIR | VOL | HID | SYS | RO
+	btfss	ZERO
+	goto	:next
+	goto	:find
+	
+:checkdir
+;	bsf	PA0
+	movf	mmc_packet, 0
+	xorlw	49h		; 'I'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 1
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	4dh		; 'M'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 2
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	45h		; 'E'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 3
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	58h		; 'X'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 4
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	50h		; 'P'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 5
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	4fh		; 'O'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 6
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	52h		; 'R'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 7
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	54h		; 'T'
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 8
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 9
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 0ah
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	20h		; ' '
+	btfss	ZERO
+	goto	:next
+	
+	bcf	PA0
+	call	mmcread		; off = 0bh
+	decf	work1, 1
+	
+	bsf	PA0
+	
+	movf	mmc_packet, 0
+	xorlw	10h
+	andlw	1eh		; nDIR | VOL | HID | SYS
+	btfss	ZERO
+	goto	:next
+	
+	bsf	MODE_DIR
+:find
+	movlw	0eh
+	movwf	work1
+:loop2
+	bcf	PA0
+	call	mmcread
+	
+	bsf	PA0
+	decfsz	work1, 1
+	goto	:loop2
+	
+	bcf	PA0
+	call	mmcread		; off = 1ah
+	movf	mmc_packet, 0
+	movwf	cur_cluster + 1
+	
+	call	mmcread		; off = 1bh
+	movf	mmc_packet, 0
+	movwf	cur_cluster
+	
+	movlw	4
+	movwf	work1
+:next				; to next entry
+	bcf	PA0
+	call	mmcread
+	
+	bsf	PA0
+	decfsz	work1, 1
+	goto	:next
+	
+;	bsf	PA0
+	decfsz	work0, 1
+	goto	:loop1
+	
+	bcf	PA0
+	call	mmcread		;CRC
+	call	mmcread
+	call	mmcstop
+	
+	movf	cur_cluster, 0
+	iorwf	cur_cluster + 1, 0
+	movlw	53h		; GPS*.* not found
+	btfsc	ZERO
+	goto	halt
+	
+	bsf	PA0
+	btfss	MODE_DIR
+	goto	waitdetect
+	
+	bcf	PA0
+	call	cluster2addr
+	
+	bsf	PA0
+	goto	getrde
+	
+;	bsf	PA0
+waitdetect
+	btfsc	RX
+	goto	waitdetect
+	
+	bcf	MMCCS		; LED(MMCCS) turn on
+	
+;	bsf	PA0
+waitdetect_error
+	bcf	PA0
+	call	wait_rxn	; skip current packet
+	
+	bsf	MMCCS		; LED(MMCCS) turn off
+	
+	bsf	PA0
+	btfss	MODE_DETECT2LOG
+	goto	setupgps
+	
+;	bsf	PA0
+:waitrx
+	btfsc	RX
+	goto	:waitrx
+	
+	bcf	PA0
+	call	rsrecv_start
+	call	rsrecv_body
+	call	rswait		; stop-bit
+	
+	movf	work0, 0
+	xorlw	0e0h
+	
+	bsf	PA0
+	btfss	ZERO
+	goto	waitdetect_error	; data error
+	
+	movlw	14h		; skip 19+1 bytes
+	movwf	bytecount
+:loop
+	bcf	PA0
+	call	wait_rx
+	
+	bsf	PA0
+	btfsc	RX
+	goto	:waitrx		; time out
+	
+	bcf	PA0
+	call	rsrecv_start
+	call	rsrecv_body
+	call	rswait		; stop-bit
+	
+	bsf	PA0
+	btfsc	work0, 7
+	goto	waitdetect_error	; data error
+	
+;	bsf	PA0
+	decfsz	bytecount, 1
+	goto	:loop
+	
+	movlw	0fch
+	addwf	work0, 0
+	bsf	PA0
+	btfss	CARRY
+	goto	waitdetect	; satellites < 4
+	
+	bcf	PA0
+	call	wait_rxn	; skip current packet
+	
+setupgps
+	bcf	PA0
+	
+	movlw	0c0h		; header
+	call	rssend
+	movlw	0a3h		; setup: periodical output-data items
+	call	rssend
+	movlw	8fh		; all items
+	call	rssend
+	movlw	0ech		; check-sum (XOR from header)
+	call	rssend
+	movlw	0cah		; terminator
+	call	rssend
+	
+	bsf	PA0
+	
+cluster_loop
+	bcf	PA0
+	call	cluster2addr
+	
+	call	clraddr
+	movlw	2		; 200h per sector
+	movwf	addr + 2
+	
+sector_loop
+	bcf	PA0
+	
+	call	mmcstart
+	movlw	58h		; write block
+	movwf	mmc_packet
+	call	mmccmd
+	
+	movf	mmc_packet, 0
+	movlw	61h		; data write failed
+	btfss	ZERO
+	goto	halt
+	
+	movlw	0ffh		; dummy data
+	call	mmcwrite
+	movlw	0feh		; data start
+	call	mmcwrite
+	
+	movlw	2		; remain bytes = 200h
+	movwf	rem_byte
+	clrf	rem_byte + 1
+	
+	bsf	PA0
+:waitrx
+	btfsc	RX
+	goto	:waitrx
+	
+	movlw	0a0h		; max 160bytes
+	movwf	bytecount
+:loop
+	bcf	PA0
+	call	wait_rx
+	
+	bsf	PA0
+	btfsc	RX
+	goto	fill_line	; time out
+	
+	bcf	PA0
+	call	rsrecv_start
+	
+	movlw	20h		; ' '
+	call	mmcwrite
+	
+	call	rsrecv_body
+;	bcf	PA0
+	
+	swapf	work0, 0
+	call	mmcwrite_hex
+	movf	work0, 0
+	call	mmcwrite_hex
+	
+	movlw	3
+	subwf	rem_byte + 1, 1
+	btfss	CARRY
+	decf	rem_byte, 1
+	
+;	call	rswait		; STOP
+	
+	bsf	PA0
+	decfsz	bytecount, 1
+	goto	:loop
+	
+	bcf	PA0
+	call	wait_rxn
+fill_line
+	bcf	PA0
+	movlw	0dh		; CR
+	call	mmcwrite
+	movlw	0ah		; LF
+	call	mmcwrite
+	
+	movlw	4		; '\r\n\r\n' in '\r\n--------\r\n'
+	subwf	rem_byte + 1, 1
+	btfss	CARRY
+	decf	rem_byte, 1
+:loop
+	bcf	PA0
+	movlw	2dh		; '-'
+	call	mmcwrite
+	
+	movlw	1
+	subwf	rem_byte + 1, 1
+	btfss	CARRY
+	decf	rem_byte, 1
+	
+	movf	rem_byte, 0
+	iorwf	rem_byte + 1, 0
+	
+	bsf	PA0
+	btfss	ZERO
+	goto	:loop
+	
+	bcf	PA0
+	movlw	0dh		; CR
+	call	mmcwrite
+	movlw	0ah		; LF
+	call	mmcwrite
+	
+;	bcf	PA0
+	call	mmcwrite	; CRC-1
+	call	mmcwrite	; CRC-2
+	call	waitwrite
+	call	mmcstop
+	
+	movlw	addr
+	call	addaddr
+	
+	call	wait250ms	; LED(MMCCS) turn off
+	
+	bsf	PA0
+	decfsz	remain_sec, 1
+	goto	sector_loop
+	
+nextcluster
+	bcf	PA0
+	
+	call	clraddr		; cluster to FAT-addr
+	movf	cur_cluster, 0
+	movwf	addr + 2
+	
+	bcf	CARRY
+	rlf	addr + 2, 1
+	rlf	addr + 1, 1
+	
+	movlw	fataddr
+	call	setaddr
+;	clrf	FSR		; select bank-0
+	
+	movlw	addr
+	call	addaddr
+	
+	call	mmcstart
+	movlw	51h		; read single block
+	movwf	mmc_packet
+	call	mmccmd
+	
+	movf	mmc_packet, 0
+	movlw	71h		; FAT read failed
+	btfss	ZERO
+	goto	halt
+	
+	call	waitread
+	
+	bsf	PA0
+	
+	movf	cur_cluster + 1, 0	; skip FAT entry
+	movwf	work1
+	btfsc	ZERO
+	goto	:exit2
+	movwf	work0
+:loop2
+	bcf	PA0
+	call	mmcread
+	call	mmcread
+	
+	bsf	PA0
+	decfsz	work0, 1
+	goto	:loop2
+:exit2
+	bcf	PA0
+	
+	call	mmcread
+	movf	mmc_packet, 0
+	movwf	cur_cluster + 1
+	call	mmcread
+	movf	mmc_packet, 0
+	movwf	cur_cluster
+	
+	bsf	PA0
+	
+	movf	work1, 0	; skip till end of sector
+	xorlw	0ffh
+	btfsc	ZERO
+	goto	:exit3
+	movwf	work0
+:loop3
+	bcf	PA0
+	call	mmcread
+	call	mmcread
+	
+	bsf	PA0
+	decfsz	work0, 1
+	goto	:loop3
+:exit3
+	
+	bcf	PA0
+	
+	call	mmcread		;CRC
+	call	mmcread
+	call	mmcstop
+	
+	bsf	PA0
+	
+	movf	cur_cluster, 1
+	btfss	ZERO
+	goto	:next
+	movf	cur_cluster + 1, 0
+	andlw	0feh
+	btfss	ZERO
+	goto	:next
+	
+	movlw	72h		; cluster-0 or 1 found in FAT-chain
+				; (may overwrite FAT)
+	bcf	PA0
+	goto	halt
+:next
+;	bsf	PA0
+	movlw	1
+	addwf	cur_cluster, 0
+	btfss	CARRY
+	goto	cluster_loop	; < 0ff00h
+	movlw	9
+	addwf	cur_cluster + 1, 0
+	btfsc	ZERO
+	goto	:badcluster	; == 0fff7h
+	btfss	CARRY
+	goto	cluster_loop
+	
+	movlw	20h		; end of file
+	bcf	PA0
+	goto	halt
+:badcluster
+	movlw	73h
+	bcf	PA0
+	goto	halt
+
+
+
+
